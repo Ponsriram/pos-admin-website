@@ -25,7 +25,7 @@ export function Header() {
   const { user, logout } = useAuth()
   const { stores, currentStore, setCurrentStore } = useStore()
 
-  const initials = user?.full_name
+  const initials = user?.name
     ?.split(' ')
     .map((n) => n[0])
     .join('')
@@ -79,7 +79,7 @@ export function Header() {
                 </AvatarFallback>
               </Avatar>
               <div className="hidden md:flex flex-col items-start text-sm">
-                <span className="font-medium">{user?.full_name || 'User'}</span>
+                <span className="font-medium">{user?.name || 'User'}</span>
               </div>
               <ChevronDown className="h-4 w-4 text-muted-foreground" />
             </Button>
@@ -87,7 +87,7 @@ export function Header() {
           <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuLabel>
               <div className="flex flex-col">
-                <span>{user?.full_name}</span>
+                <span>{user?.name}</span>
                 <span className="text-xs font-normal text-muted-foreground">
                   {user?.email}
                 </span>

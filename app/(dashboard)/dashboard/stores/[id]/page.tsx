@@ -42,7 +42,7 @@ import {
   Trash2,
 } from 'lucide-react'
 import { api } from '@/lib/api'
-import type { Store, Table, Employee, AnalyticsSummary } from '@/lib/types'
+import type { Store, TableLabel, Employee, AnalyticsSummary } from '@/lib/types'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -51,49 +51,10 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Spinner } from '@/components/ui/spinner'
 
-// Demo data
-const demoStore: Store = {
-  id: '1',
-  name: 'Downtown Kitchen',
-  address: '123 Main Street, Downtown',
-  phone: '+1 (555) 123-4567',
-  owner_id: '1',
-  created_at: '2024-01-15T10:00:00Z',
-  updated_at: '2024-03-10T14:30:00Z',
-  table_count: 15,
-}
-
-const demoTables: Table[] = [
-  { id: '1', store_id: '1', label: 'Table 01', capacity: 4, status: 'available' },
-  { id: '2', store_id: '1', label: 'Table 02', capacity: 2, status: 'occupied' },
-  { id: '3', store_id: '1', label: 'Table 03', capacity: 6, status: 'available' },
-  { id: '4', store_id: '1', label: 'Table 04', capacity: 4, status: 'reserved' },
-  { id: '5', store_id: '1', label: 'Table 05', capacity: 8, status: 'available' },
-  { id: '6', store_id: '1', label: 'Table 06', capacity: 2, status: 'occupied' },
-]
-
-const demoEmployees: Employee[] = [
-  { id: '1', store_id: '1', full_name: 'John Smith', email: 'john@example.com', phone: '+1 555-1234', role: 'manager', is_active: true, created_at: '2024-01-15T10:00:00Z', updated_at: '2024-03-10T14:30:00Z' },
-  { id: '2', store_id: '1', full_name: 'Sarah Johnson', email: 'sarah@example.com', phone: '+1 555-2345', role: 'cashier', is_active: true, created_at: '2024-02-01T09:00:00Z', updated_at: '2024-03-08T11:20:00Z' },
-  { id: '3', store_id: '1', full_name: 'Mike Wilson', email: 'mike@example.com', phone: '+1 555-3456', role: 'waiter', is_active: true, created_at: '2024-02-20T08:00:00Z', updated_at: '2024-03-05T16:45:00Z' },
-  { id: '4', store_id: '1', full_name: 'Emily Davis', email: 'emily@example.com', phone: '+1 555-4567', role: 'kitchen', is_active: false, created_at: '2024-03-01T07:00:00Z', updated_at: '2024-03-03T12:15:00Z' },
-]
-
-const demoAnalytics: AnalyticsSummary = {
-  total_revenue: 45678.90,
-  total_orders: 1234,
-  net_sales: 42345.67,
-  cash_payments: 15678.90,
-  card_payments: 20123.45,
-  upi_payments: 6543.22,
-  average_order_value: 37.02,
-  period: 'last_30_days',
-}
-
 export default function StoreDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const [store, setStore] = useState<Store | null>(null)
-  const [tables, setTables] = useState<Table[]>([])
+  const [tables, setTables] = useState<TableLabel[]>([])
   const [employees, setEmployees] = useState<Employee[]>([])
   const [analytics, setAnalytics] = useState<AnalyticsSummary | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -108,22 +69,18 @@ export default function StoreDetailPage({ params }: { params: Promise<{ id: stri
   const loadData = async () => {
     setIsLoading(true)
     try {
-      const [storeData, tablesData, employeesData, analyticsData] = await Promise.all([
+      const [storeData, tablesResponse, employeesData, analyticsData] = await Promise.all([
         api.getStore(id),
         api.getStoreTables(id),
         api.getEmployees(id),
         api.getAnalyticsSummary(id),
       ])
       setStore(storeData)
-      setTables(tablesData)
+      setTables(tablesResponse.tables || [])
       setEmployees(employeesData)
       setAnalytics(analyticsData)
-    } catch {
-      // Use demo data
-      setStore(demoStore)
-      setTables(demoTables)
-      setEmployees(demoEmployees)
-      setAnalytics(demoAnalytics)
+    } catch (error) {
+      console.error('Failed to load store data:', error)
     } finally {
       setIsLoading(false)
     }
@@ -133,78 +90,53 @@ export default function StoreDetailPage({ params }: { params: Promise<{ id: stri
     if (!tableForm.label) return
     setIsSubmitting(true)
     try {
-      const newTable = await api.createTable(id, {
-        label: tableForm.label,
-        capacity: parseInt(tableForm.capacity),
-      })
-      setTables((prev) => [...prev, newTable])
-      setIsTableDialogOpen(false)
-      setTableForm({ label: '', capacity: '4' })
-    } catch {
-      // Demo: add fake table
-      const fakeTable: Table = {
-        id: String(tables.length + 1),
-        store_id: id,
-        label: tableForm.label,
-        capacity: parseInt(tableForm.capacity),
-        status: 'available',
+      // Update the store's table_count via API
+      if (store) {
+        await api.updateStore(id, { table_count: (store.table_count || 0) + 1 })
+        // Refresh tables
+        const tablesResponse = await api.getStoreTables(id)
+        setTables(tablesResponse.tables || [])
       }
-      setTables((prev) => [...prev, fakeTable])
       setIsTableDialogOpen(false)
       setTableForm({ label: '', capacity: '4' })
+    } catch (error) {
+      console.error('Failed to create table:', error)
     } finally {
       setIsSubmitting(false)
     }
   }
 
-  const handleDeleteTable = async (tableId: string) => {
+  const handleDeleteTable = async () => {
     try {
-      await api.deleteTable(id, tableId)
-      setTables((prev) => prev.filter((t) => t.id !== tableId))
-    } catch {
-      setTables((prev) => prev.filter((t) => t.id !== tableId))
+      if (store && store.table_count > 0) {
+        await api.updateStore(id, { table_count: store.table_count - 1 })
+        const tablesResponse = await api.getStoreTables(id)
+        setTables(tablesResponse.tables || [])
+      }
+    } catch (error) {
+      console.error('Failed to delete table:', error)
     }
   }
 
-  const tableColumns: ColumnDef<Table>[] = [
+  const tableColumns: ColumnDef<TableLabel>[] = [
     {
-      accessorKey: 'label',
+      accessorKey: 'table_label',
       header: 'Table',
-      cell: ({ row }) => <span className="font-medium">{row.getValue('label')}</span>,
+      cell: ({ row }) => <span className="font-medium">{row.getValue('table_label')}</span>,
     },
     {
-      accessorKey: 'capacity',
-      header: 'Capacity',
+      accessorKey: 'table_number',
+      header: 'Number',
       cell: ({ row }) => (
         <div className="flex items-center gap-2">
           <Users className="h-4 w-4 text-muted-foreground" />
-          {row.getValue('capacity')} seats
+          Table {row.getValue('table_number')}
         </div>
       ),
     },
     {
-      accessorKey: 'status',
-      header: 'Status',
-      cell: ({ row }) => {
-        const status = row.getValue('status') as string
-        return (
-          <Badge
-            variant={
-              status === 'available' ? 'default' :
-              status === 'occupied' ? 'destructive' : 'secondary'
-            }
-            className={
-              status === 'available' ? 'bg-green-500/10 text-green-600 hover:bg-green-500/20' : ''
-            }
-          >
-            {status}
-          </Badge>
-        )
-      },
-    },
-    {
       id: 'actions',
-      cell: ({ row }) => (
+      cell: () => (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon">
@@ -218,7 +150,7 @@ export default function StoreDetailPage({ params }: { params: Promise<{ id: stri
             </DropdownMenuItem>
             <DropdownMenuItem
               className="text-destructive"
-              onClick={() => handleDeleteTable(row.original.id)}
+              onClick={() => handleDeleteTable()}
             >
               <Trash2 className="h-4 w-4 mr-2" />
               Delete
@@ -231,9 +163,9 @@ export default function StoreDetailPage({ params }: { params: Promise<{ id: stri
 
   const employeeColumns: ColumnDef<Employee>[] = [
     {
-      accessorKey: 'full_name',
+      accessorKey: 'name',
       header: 'Name',
-      cell: ({ row }) => <span className="font-medium">{row.getValue('full_name')}</span>,
+      cell: ({ row }) => <span className="font-medium">{row.getValue('name')}</span>,
     },
     {
       accessorKey: 'email',
@@ -292,6 +224,11 @@ export default function StoreDetailPage({ params }: { params: Promise<{ id: stri
     )
   }
 
+  // Compute average order value from analytics
+  const averageOrderValue = analytics && analytics.total_orders > 0
+    ? analytics.total_revenue / analytics.total_orders
+    : 0
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -305,10 +242,10 @@ export default function StoreDetailPage({ params }: { params: Promise<{ id: stri
           <div>
             <h1 className="text-2xl font-semibold">{store.name}</h1>
             <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
-              {store.address && (
+              {store.location && (
                 <span className="flex items-center gap-1">
                   <MapPin className="h-4 w-4" />
-                  {store.address}
+                  {store.location}
                 </span>
               )}
               {store.phone && (
@@ -379,7 +316,7 @@ export default function StoreDetailPage({ params }: { params: Promise<{ id: stri
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">
-                  ${analytics?.average_order_value.toFixed(2) || '0'}
+                  ${averageOrderValue.toFixed(2)}
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">Per order</p>
               </CardContent>
@@ -393,9 +330,9 @@ export default function StoreDetailPage({ params }: { params: Promise<{ id: stri
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">
-                  {tables.filter((t) => t.status === 'occupied').length} / {tables.length}
+                  {tables.length}
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">Currently occupied</p>
+                <p className="text-xs text-muted-foreground mt-1">Total tables</p>
               </CardContent>
             </Card>
           </div>
@@ -442,7 +379,7 @@ export default function StoreDetailPage({ params }: { params: Promise<{ id: stri
           <DataTable
             columns={employeeColumns}
             data={employees}
-            searchKey="full_name"
+            searchKey="name"
             searchPlaceholder="Search employees..."
           />
         </TabsContent>
@@ -505,7 +442,7 @@ export default function StoreDetailPage({ params }: { params: Promise<{ id: stri
           <DataTable
             columns={tableColumns}
             data={tables}
-            searchKey="label"
+            searchKey="table_label"
             searchPlaceholder="Search tables..."
           />
         </TabsContent>
@@ -517,18 +454,15 @@ export default function StoreDetailPage({ params }: { params: Promise<{ id: stri
                 <CardTitle className="text-sm font-medium">Payment Methods</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Cash</span>
-                  <span className="font-medium">${analytics?.cash_payments.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Card</span>
-                  <span className="font-medium">${analytics?.card_payments.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">UPI</span>
-                  <span className="font-medium">${analytics?.upi_payments.toLocaleString()}</span>
-                </div>
+                {analytics?.payment_breakdown && Object.entries(analytics.payment_breakdown).map(([method, amount]) => (
+                  <div key={method} className="flex justify-between">
+                    <span className="text-muted-foreground capitalize">{method}</span>
+                    <span className="font-medium">${amount.toLocaleString()}</span>
+                  </div>
+                ))}
+                {(!analytics?.payment_breakdown || Object.keys(analytics.payment_breakdown).length === 0) && (
+                  <p className="text-muted-foreground text-sm">No payment data</p>
+                )}
               </CardContent>
             </Card>
             <Card>
@@ -537,7 +471,7 @@ export default function StoreDetailPage({ params }: { params: Promise<{ id: stri
               </CardHeader>
               <CardContent>
                 <div className="text-3xl font-bold text-primary">
-                  ${analytics?.net_sales.toLocaleString()}
+                  ${analytics?.net_sales.toLocaleString() || '0'}
                 </div>
                 <p className="text-sm text-muted-foreground mt-2">After taxes and discounts</p>
               </CardContent>
@@ -549,11 +483,11 @@ export default function StoreDetailPage({ params }: { params: Promise<{ id: stri
               <CardContent className="space-y-4">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Total Orders</span>
-                  <span className="font-medium">{analytics?.total_orders}</span>
+                  <span className="font-medium">{analytics?.total_orders || 0}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Avg Order</span>
-                  <span className="font-medium">${analytics?.average_order_value.toFixed(2)}</span>
+                  <span className="font-medium">${averageOrderValue.toFixed(2)}</span>
                 </div>
               </CardContent>
             </Card>

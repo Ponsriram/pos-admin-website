@@ -43,58 +43,15 @@ import {
 } from 'lucide-react'
 import { api } from '@/lib/api'
 import type { Order, OrderStatus, OrderTimelineEvent, Payment, PaymentMethod, KOT } from '@/lib/types'
+import { useStore } from '@/contexts/store-context'
 import { format } from 'date-fns'
 import { cn } from '@/lib/utils'
 import { Spinner } from '@/components/ui/spinner'
 
-const demoOrder: Order = {
-  id: '1',
-  order_number: '231128421',
-  store_id: '1',
-  table_id: 't3',
-  table_label: 'Table 03',
-  customer_name: 'Budianto Siregar',
-  customer_phone: '+1 555-1234',
-  order_type: 'dine_in',
-  status: 'preparing',
-  items: [
-    { id: '1', order_id: '1', menu_item_id: '1', menu_item_name: 'Grilled Lobster', quantity: 1, unit_price: 32, add_ons: [{ name: 'Extra butter', price: 2 }], subtotal: 34 },
-    { id: '2', order_id: '1', menu_item_id: '2', menu_item_name: 'Beef Wellington', quantity: 2, unit_price: 26.30, subtotal: 52.60 },
-    { id: '3', order_id: '1', menu_item_id: '6', menu_item_name: 'Wagyu Steak', quantity: 1, unit_price: 27.50, add_ons: [{ name: 'Garlic Butter', price: 1.50 }, { name: 'Truffle Sauce', price: 2.00 }], subtotal: 31 },
-  ],
-  subtotal: 117.60,
-  tax: 8.47,
-  discount: 10,
-  total: 116.07,
-  payment_status: 'pending',
-  created_at: '2025-10-05T11:32:00Z',
-  updated_at: '2025-10-05T12:15:00Z',
-  progress: 60,
-}
-
-const demoTimeline: OrderTimelineEvent[] = [
-  { id: '1', order_id: '1', event_type: 'created', description: 'Order placed by customer', created_at: '2025-10-05T11:32:00Z', created_by: 'Sarah (Waiter)' },
-  { id: '2', order_id: '1', event_type: 'confirmed', description: 'Order confirmed by kitchen', created_at: '2025-10-05T11:35:00Z', created_by: 'Mike (Kitchen)' },
-  { id: '3', order_id: '1', event_type: 'preparing', description: 'Order is being prepared', created_at: '2025-10-05T11:40:00Z', created_by: 'Kitchen' },
-]
-
-const demoPayments: Payment[] = []
-
-const demoKOT: KOT = {
-  id: 'kot1',
-  order_id: '1',
-  store_id: '1',
-  items: [
-    { menu_item_name: 'Grilled Lobster', quantity: 1, notes: 'Extra butter' },
-    { menu_item_name: 'Beef Wellington', quantity: 2 },
-    { menu_item_name: 'Wagyu Steak', quantity: 1, notes: 'Medium rare' },
-  ],
-  status: 'preparing',
-  created_at: '2025-10-05T11:32:00Z',
-}
-
 export default function OrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
+  const { currentStore } = useStore()
+  const storeId = currentStore?.id
   const [order, setOrder] = useState<Order | null>(null)
   const [timeline, setTimeline] = useState<OrderTimelineEvent[]>([])
   const [payments, setPayments] = useState<Payment[]>([])
@@ -108,48 +65,32 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   })
 
   useEffect(() => {
-    loadData()
-  }, [id])
+    if (storeId) loadData()
+  }, [id, storeId])
 
   const loadData = async () => {
+    if (!storeId) return
     setIsLoading(true)
     try {
-      const storeId = '1' // Would get from context
       const [orderData, timelineData, paymentsData] = await Promise.all([
         api.getOrder(storeId, id),
-        api.getOrderTimeline(storeId, id),
-        api.getOrderPayments(storeId, id),
+        api.getOrderTimeline(storeId, id).catch(() => [] as OrderTimelineEvent[]),
+        api.getOrderPayments(storeId, id).catch(() => [] as Payment[]),
       ])
       setOrder(orderData)
       setTimeline(timelineData)
       setPayments(paymentsData)
-    } catch {
-      setOrder(demoOrder)
-      setTimeline(demoTimeline)
-      setPayments(demoPayments)
-      setKot(demoKOT)
+    } catch (error) {
+      console.error('Failed to load order:', error)
     } finally {
       setIsLoading(false)
     }
   }
 
   const handleUpdateStatus = async (status: OrderStatus) => {
-    if (!order) return
+    if (!order || !storeId) return
     try {
-      await api.updateOrderStatus(order.store_id, order.id, status)
-      setOrder((prev) => (prev ? { ...prev, status } : prev))
-      // Add to timeline
-      setTimeline((prev) => [
-        ...prev,
-        {
-          id: String(prev.length + 1),
-          order_id: order.id,
-          event_type: status,
-          description: `Order status changed to ${status}`,
-          created_at: new Date().toISOString(),
-        },
-      ])
-    } catch {
+      await api.updateOrderStatus(storeId, order.id, status)
       setOrder((prev) => (prev ? { ...prev, status } : prev))
       setTimeline((prev) => [
         ...prev,
@@ -161,52 +102,40 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
           created_at: new Date().toISOString(),
         },
       ])
+    } catch (error) {
+      console.error('Failed to update order status:', error)
     }
   }
 
   const handleAddPayment = async () => {
-    if (!order || !paymentForm.amount) return
+    if (!order || !paymentForm.amount || !storeId) return
     setIsSubmitting(true)
     try {
-      const payment = await api.createPayment(order.store_id, order.id, {
+      const payment = await api.createPayment(storeId, order.id, {
         amount: parseFloat(paymentForm.amount),
         method: paymentForm.method,
       })
       setPayments((prev) => [...prev, payment])
+      const orderTotal = order.net_amount || order.total || 0
       const totalPaid = [...payments, payment].reduce((sum, p) => sum + p.amount, 0)
-      if (totalPaid >= order.total) {
-        setOrder((prev) => (prev ? { ...prev, payment_status: 'paid' } : prev))
+      if (totalPaid >= orderTotal) {
+        setOrder((prev) => (prev ? { ...prev, payment_status: 'completed' } : prev))
       }
       setIsPaymentDialogOpen(false)
       setPaymentForm({ amount: '', method: 'card' })
-    } catch {
-      const fakePayment: Payment = {
-        id: String(payments.length + 1),
-        order_id: order.id,
-        amount: parseFloat(paymentForm.amount),
-        method: paymentForm.method,
-        status: 'paid',
-        created_at: new Date().toISOString(),
-      }
-      setPayments((prev) => [...prev, fakePayment])
-      const totalPaid = [...payments, fakePayment].reduce((sum, p) => sum + p.amount, 0)
-      if (totalPaid >= order.total) {
-        setOrder((prev) => (prev ? { ...prev, payment_status: 'paid' } : prev))
-      }
-      setIsPaymentDialogOpen(false)
-      setPaymentForm({ amount: '', method: 'card' })
+    } catch (error) {
+      console.error('Failed to add payment:', error)
     } finally {
       setIsSubmitting(false)
     }
   }
 
   const handlePrintKOT = () => {
-    // In a real app, this would trigger the KOT print
     window.print()
   }
 
-  const getStatusColor = (status: OrderStatus) => {
-    const colors: Record<OrderStatus, string> = {
+  const getStatusColor = (status: string) => {
+    const colors: Record<string, string> = {
       pending: 'bg-yellow-500',
       confirmed: 'bg-blue-500',
       preparing: 'bg-orange-500',
@@ -214,19 +143,32 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
       served: 'bg-teal-500',
       completed: 'bg-emerald-500',
       cancelled: 'bg-red-500',
+      created: 'bg-gray-500',
+      payment_received: 'bg-green-500',
     }
-    return colors[status]
+    return colors[status] || 'bg-gray-500'
   }
 
-  const getOrderTypeIcon = (type: Order['order_type']) => {
+  const getOrderTypeIcon = (type: string) => {
     switch (type) {
       case 'dine_in':
         return <Utensils className="h-4 w-4" />
+      case 'takeaway':
       case 'take_away':
         return <ShoppingBag className="h-4 w-4" />
       case 'delivery':
         return <Truck className="h-4 w-4" />
+      default:
+        return <ShoppingBag className="h-4 w-4" />
     }
+  }
+
+  if (!storeId) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <p className="text-muted-foreground">Please select a store to view order details</p>
+      </div>
+    )
   }
 
   if (isLoading) {
@@ -258,8 +200,14 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     )
   }
 
+  // Use backend fields with fallback to frontend aliases
+  const orderTotal = order.net_amount || order.total || 0
+  const orderSubtotal = order.gross_amount || order.subtotal || 0
+  const orderTax = order.tax_amount || order.tax || 0
+  const orderDiscount = order.discount_amount || order.discount || 0
+
   const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0)
-  const remainingAmount = order.total - totalPaid
+  const remainingAmount = orderTotal - totalPaid
 
   return (
     <div className="space-y-6">
@@ -288,8 +236,8 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                 {order.status}
               </Badge>
               <Badge
-                variant={order.payment_status === 'paid' ? 'default' : 'secondary'}
-                className={order.payment_status === 'paid' ? 'bg-green-500 text-white' : ''}
+                variant={order.payment_status === 'completed' || order.payment_status === 'paid' ? 'default' : 'secondary'}
+                className={order.payment_status === 'completed' || order.payment_status === 'paid' ? 'bg-green-500 text-white' : ''}
               >
                 {order.payment_status}
               </Badge>
@@ -398,50 +346,55 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {order.items.map((item) => (
-                  <div key={item.id} className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">{item.menu_item_name}</span>
-                        <Badge variant="secondary" className="text-xs">
-                          x{item.quantity}
-                        </Badge>
-                      </div>
-                      {item.add_ons && item.add_ons.length > 0 && (
-                        <div className="mt-1 text-sm text-muted-foreground">
-                          Add-ons:{' '}
-                          {item.add_ons.map((a, i) => (
-                            <span key={i}>
-                              {a.name} (+${a.price.toFixed(2)})
-                              {i < item.add_ons!.length - 1 ? ', ' : ''}
-                            </span>
-                          ))}
+                {order.items.map((item) => {
+                  const itemName = item.product_name || item.menu_item_name || 'Unknown Item'
+                  const itemPrice = item.price || item.unit_price || 0
+                  const itemTotal = item.total || item.subtotal || (itemPrice * item.quantity)
+                  return (
+                    <div key={item.id} className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">{itemName}</span>
+                          <Badge variant="secondary" className="text-xs">
+                            x{item.quantity}
+                          </Badge>
                         </div>
-                      )}
+                        {item.add_ons && item.add_ons.length > 0 && (
+                          <div className="mt-1 text-sm text-muted-foreground">
+                            Add-ons:{' '}
+                            {item.add_ons.map((a, i) => (
+                              <span key={i}>
+                                {a.name} (+${a.price.toFixed(2)})
+                                {i < item.add_ons!.length - 1 ? ', ' : ''}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <span className="font-medium">${itemTotal.toFixed(2)}</span>
                     </div>
-                    <span className="font-medium">${item.subtotal.toFixed(2)}</span>
-                  </div>
-                ))}
+                  )
+                })}
                 <Separator />
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Subtotal</span>
-                    <span>${order.subtotal.toFixed(2)}</span>
+                    <span>${orderSubtotal.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Tax</span>
-                    <span>+${order.tax.toFixed(2)}</span>
+                    <span>+${orderTax.toFixed(2)}</span>
                   </div>
-                  {order.discount > 0 && (
+                  {orderDiscount > 0 && (
                     <div className="flex justify-between text-sm text-green-600">
                       <span>Discount</span>
-                      <span>-${order.discount.toFixed(2)}</span>
+                      <span>-${orderDiscount.toFixed(2)}</span>
                     </div>
                   )}
                   <Separator />
                   <div className="flex justify-between font-semibold text-lg">
                     <span>Total</span>
-                    <span className="text-primary">${order.total.toFixed(2)}</span>
+                    <span className="text-primary">${orderTotal.toFixed(2)}</span>
                   </div>
                 </div>
               </div>
@@ -449,38 +402,40 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
           </Card>
 
           {/* Timeline */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Order Timeline</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="relative space-y-6">
-                {timeline.map((event, index) => (
-                  <div key={event.id} className="flex gap-4">
-                    <div className="relative flex flex-col items-center">
-                      <div
-                        className={cn(
-                          'h-3 w-3 rounded-full',
-                          getStatusColor(event.event_type as OrderStatus)
+          {timeline.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Order Timeline</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="relative space-y-6">
+                  {timeline.map((event, index) => (
+                    <div key={event.id} className="flex gap-4">
+                      <div className="relative flex flex-col items-center">
+                        <div
+                          className={cn(
+                            'h-3 w-3 rounded-full',
+                            getStatusColor(event.event_type)
+                          )}
+                        />
+                        {index < timeline.length - 1 && (
+                          <div className="w-px flex-1 bg-border mt-2" />
                         )}
-                      />
-                      {index < timeline.length - 1 && (
-                        <div className="w-px flex-1 bg-border mt-2" />
-                      )}
+                      </div>
+                      <div className="flex-1 pb-6">
+                        <p className="font-medium capitalize">{event.event_type.replace('_', ' ')}</p>
+                        <p className="text-sm text-muted-foreground">{event.description}</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {format(new Date(event.created_at), 'PPp')}
+                          {event.created_by && ` - ${event.created_by}`}
+                        </p>
+                      </div>
                     </div>
-                    <div className="flex-1 pb-6">
-                      <p className="font-medium capitalize">{event.event_type.replace('_', ' ')}</p>
-                      <p className="text-sm text-muted-foreground">{event.description}</p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {format(new Date(event.created_at), 'PPp')}
-                        {event.created_by && ` - ${event.created_by}`}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
 
         {/* Right column */}
@@ -494,7 +449,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
               <div className="space-y-2">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Total Amount</span>
-                  <span className="font-medium">${order.total.toFixed(2)}</span>
+                  <span className="font-medium">${orderTotal.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Paid</span>
@@ -519,7 +474,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                       <div key={payment.id} className="flex items-center justify-between text-sm">
                         <div className="flex items-center gap-2">
                           <CreditCard className="h-4 w-4 text-muted-foreground" />
-                          <span className="capitalize">{payment.method}</span>
+                          <span className="capitalize">{payment.payment_method || payment.method}</span>
                         </div>
                         <span>${payment.amount.toFixed(2)}</span>
                       </div>
@@ -528,7 +483,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                 </>
               )}
 
-              {order.payment_status !== 'paid' && (
+              {order.payment_status !== 'completed' && order.payment_status !== 'paid' && (
                 <Dialog open={isPaymentDialogOpen} onOpenChange={setIsPaymentDialogOpen}>
                   <DialogTrigger asChild>
                     <Button className="w-full">

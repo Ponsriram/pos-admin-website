@@ -12,19 +12,11 @@ import { UtensilsCrossed, Loader2 } from 'lucide-react'
 
 export default function LoginPage() {
   const router = useRouter()
-  const { login, isDemoMode, isAuthenticated, isLoading: authLoading } = useAuth()
+  const { login, isAuthenticated, isLoading: authLoading } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [isLoading, setIsLoading] = useState(false)
-
-  // Set demo credentials once mounted
-  useEffect(() => {
-    if (isDemoMode) {
-      setEmail('demo@restaurant.com')
-      setPassword('demo123')
-    }
-  }, [isDemoMode])
 
   // Redirect if already authenticated
   useEffect(() => {
@@ -68,11 +60,6 @@ export default function LoginPage() {
           <CardDescription>
             Sign in to your restaurant dashboard
           </CardDescription>
-          {isDemoMode && (
-            <div className="mt-3 rounded-lg bg-primary/10 p-2 text-xs text-primary">
-              Demo mode - any credentials will work
-            </div>
-          )}
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">

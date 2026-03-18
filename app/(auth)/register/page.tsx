@@ -41,7 +41,7 @@ export default function RegisterPage() {
       await register({
         email,
         password,
-        full_name: fullName,
+        name: fullName,
         phone: phone || undefined,
       })
       router.push('/dashboard')

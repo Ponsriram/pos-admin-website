@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/select'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { MoreHorizontal, CreditCard, X } from 'lucide-react'
-import type { MenuItem, Table, OrderType, PaymentMethod } from '@/lib/types'
+import type { MenuItem, TableLabel, OrderType, PaymentMethod } from '@/lib/types'
 
 interface CartItem {
   menuItem: MenuItem
@@ -25,7 +25,7 @@ interface CartItem {
 
 interface OrderSummaryProps {
   cartItems: CartItem[]
-  tables: Table[]
+  tables: TableLabel[]
   customerName: string
   selectedTable: string
   orderType: OrderType
@@ -118,8 +118,8 @@ export function OrderSummary({
                 </SelectTrigger>
                 <SelectContent>
                   {tables.map((table) => (
-                    <SelectItem key={table.id} value={table.id}>
-                      {table.label}
+                    <SelectItem key={table.table_number} value={String(table.table_number)}>
+                      {table.table_label}
                     </SelectItem>
                   ))}
                 </SelectContent>

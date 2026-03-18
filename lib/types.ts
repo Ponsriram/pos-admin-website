@@ -1,6 +1,138 @@
-// API Types based on OpenAPI specification
+// API Types aligned with backend Pydantic schemas
 
-// Permission Groups
+// ── Auth Types ───────────────────────────────────────────────────────────
+
+export interface UserRegister {
+  name: string
+  email: string
+  phone?: string
+  password: string
+  role?: string
+}
+
+export interface UserLogin {
+  email: string
+  password: string
+}
+
+export interface UserResponse {
+  id: string
+  name: string
+  email: string
+  phone?: string
+  role: string
+  is_active: boolean
+  created_at: string
+}
+
+export interface TokenResponse {
+  access_token: string
+  token_type: string
+  user?: UserResponse
+}
+
+// ── Store Types ──────────────────────────────────────────────────────────
+
+export interface Store {
+  id: string
+  owner_id: string
+  name: string
+  location?: string
+  phone?: string
+  email?: string
+  timezone: string
+  currency: string
+  tax_inclusive: boolean
+  chain_id?: string
+  state?: string
+  city?: string
+  outlet_type?: string
+  table_count: number
+  is_active: boolean
+  created_at: string
+}
+
+export interface StoreCreate {
+  name: string
+  location?: string
+  phone?: string
+  email?: string
+  timezone?: string
+  currency?: string
+  tax_inclusive?: boolean
+  chain_id?: string
+  state?: string
+  city?: string
+  outlet_type?: string
+  table_count?: number
+}
+
+export interface StoreUpdate extends Partial<StoreCreate> {
+  is_active?: boolean
+}
+
+// ── Table Types (dynamic labels from table_count) ────────────────────────
+
+export interface TableLabel {
+  table_number: number
+  table_label: string
+}
+
+export interface StoreTablesResponse {
+  store_id: string
+  table_count: number
+  tables: TableLabel[]
+}
+
+// For backward compatibility in components that need Table-like objects
+export interface Table {
+  id: string
+  store_id: string
+  label: string
+  capacity: number
+  status: 'available' | 'occupied' | 'reserved'
+}
+
+// ── Employee Types ───────────────────────────────────────────────────────
+
+export interface Employee {
+  id: string
+  store_id: string
+  user_id?: string
+  name: string
+  employee_code: string
+  phone?: string
+  email?: string
+  role: string
+  is_active: boolean
+  permissions?: Record<string, unknown> | null
+  created_at: string
+}
+
+export interface EmployeeCreate {
+  store_id: string
+  name: string
+  employee_code: string
+  pin: string
+  phone?: string
+  email?: string
+  role?: string
+  user_id?: string
+  permissions?: string[]
+}
+
+export interface EmployeeUpdate {
+  name?: string
+  pin?: string
+  phone?: string
+  email?: string
+  role?: string
+  is_active?: boolean
+  permissions?: string[]
+}
+
+// ── Permission Groups (frontend-only for now) ────────────────────────────
+
 export interface PermissionGroup {
   id: string
   name: string
@@ -8,53 +140,16 @@ export interface PermissionGroup {
   created_at: string
 }
 
-// Employee Types
-export interface Employee {
+// ── Menu Types ───────────────────────────────────────────────────────────
+
+export interface Category {
   id: string
   store_id: string
-  user_id?: string
-  full_name: string
-  email: string
-  phone?: string
-  role: 'owner' | 'manager' | 'cashier' | 'waiter' | 'kitchen'
-  permission_group_id?: string
-  permission_group?: PermissionGroup
-  is_active: boolean
-  created_at: string
-  updated_at: string
-}
-
-export interface EmployeeCreate {
-  full_name: string
-  email: string
-  phone?: string
-  role: Employee['role']
-  permission_group_id?: string
-  is_active?: boolean
-}
-
-export interface EmployeeUpdate extends Partial<EmployeeCreate> {}
-
-// Store Create/Update
-export interface StoreCreate {
   name: string
-  address?: string
-  phone?: string
+  description?: string
+  sort_order: number
 }
 
-export interface StoreUpdate extends Partial<StoreCreate> {}
-
-// Table Create/Update
-export interface TableCreate {
-  label: string
-  capacity: number
-}
-
-export interface TableUpdate extends Partial<TableCreate> {
-  status?: 'available' | 'occupied' | 'reserved'
-}
-
-// Category Create/Update
 export interface CategoryCreate {
   name: string
   description?: string
@@ -63,7 +158,18 @@ export interface CategoryCreate {
 
 export interface CategoryUpdate extends Partial<CategoryCreate> {}
 
-// Menu Item Create/Update
+export interface MenuItem {
+  id: string
+  store_id: string
+  category_id: string
+  name: string
+  description?: string
+  price: number
+  image_url?: string
+  is_available: boolean
+  is_vegetarian?: boolean
+}
+
 export interface MenuItemCreate {
   category_id: string
   name: string
@@ -76,16 +182,124 @@ export interface MenuItemCreate {
 
 export interface MenuItemUpdate extends Partial<MenuItemCreate> {}
 
-// Menu Schedule
-export interface MenuSchedule {
+export interface AddOn {
   id: string
-  menu_id: string
-  day_of_week: number
-  start_time: string
-  end_time: string
+  name: string
+  price: number
 }
 
-// KOT (Kitchen Order Ticket)
+// ── Order Types ──────────────────────────────────────────────────────────
+
+export type OrderStatus = 'pending' | 'confirmed' | 'preparing' | 'ready' | 'served' | 'completed' | 'cancelled'
+export type OrderType = 'dine_in' | 'takeaway' | 'delivery'
+export type PaymentMethod = 'cash' | 'card' | 'upi' | 'wallet' | 'gift_card'
+export type PaymentStatus = 'pending' | 'completed' | 'refunded'
+
+export interface OrderItem {
+  id: string
+  order_id: string
+  product_id?: string
+  product_name: string
+  quantity: number
+  price: number
+  tax_amount: number
+  discount_amount: number
+  total: number
+  status: string
+  notes?: string
+  kitchen_status?: string
+  cancel_reason?: string
+  // Frontend convenience fields (mapped from backend)
+  menu_item_id?: string
+  menu_item_name?: string
+  unit_price?: number
+  subtotal?: number
+  add_ons?: OrderItemAddOn[]
+}
+
+export interface OrderItemAddOn {
+  name: string
+  price: number
+}
+
+export interface Order {
+  id: string
+  store_id: string
+  employee_id?: string
+  terminal_id?: string
+  table_number?: number
+  guest_id?: string
+  shift_id?: string
+  order_number?: string
+  order_type: string
+  status: OrderStatus
+  channel?: string
+  gross_amount: number
+  tax_amount: number
+  discount_amount: number
+  service_charge: number
+  tip_amount: number
+  net_amount: number
+  payment_status: string
+  notes?: string
+  cancel_reason?: string
+  device_id?: string
+  sync_status?: string
+  created_at: string
+  updated_at?: string
+  items: OrderItem[]
+  // Convenience aliases for UI (computed from backend fields)
+  table_label?: string
+  customer_name?: string
+  customer_phone?: string
+  subtotal?: number
+  tax?: number
+  discount?: number
+  total?: number
+  progress?: number
+}
+
+export interface OrderCreate {
+  store_id: string
+  employee_id?: string
+  terminal_id?: string
+  table_number?: number
+  guest_id?: string
+  shift_id?: string
+  order_type: string
+  channel?: string
+  discount_amount?: number
+  service_charge?: number
+  notes?: string
+  items: {
+    product_id: string
+    quantity: number
+    price: number
+    notes?: string
+  }[]
+}
+
+// ── Payment Types ────────────────────────────────────────────────────────
+
+export interface Payment {
+  id: string
+  order_id: string
+  payment_method: string
+  amount: number
+  tip_amount: number
+  reference?: string
+  is_refund: boolean
+  paid_at: string
+  device_id?: string
+  sync_status?: string
+  // Convenience aliases for UI
+  method?: string
+  status?: string
+  created_at?: string
+}
+
+// ── KOT (Kitchen Order Ticket) ───────────────────────────────────────────
+
 export interface KOT {
   id: string
   order_id: string
@@ -102,7 +316,8 @@ export interface KOTItem {
   notes?: string
 }
 
-// Inventory
+// ── Inventory ────────────────────────────────────────────────────────────
+
 export interface InventoryItem {
   id: string
   store_id: string
@@ -115,182 +330,50 @@ export interface InventoryItem {
   last_updated: string
 }
 
-// Order Timeline Event
+// ── Order Timeline Event ─────────────────────────────────────────────────
+
 export interface OrderTimelineEvent {
   id: string
   order_id: string
-  event_type: 'created' | 'confirmed' | 'preparing' | 'ready' | 'served' | 'completed' | 'cancelled' | 'payment_received'
+  event_type: 'pending' | 'created' | 'confirmed' | 'preparing' | 'ready' | 'served' | 'completed' | 'cancelled' | 'payment_received'
   description: string
   created_at: string
   created_by?: string
 }
 
-// Payment
-export interface Payment {
-  id: string
-  order_id: string
-  amount: number
-  method: PaymentMethod
-  status: PaymentStatus
-  transaction_id?: string
-  created_at: string
-}
+// ── Analytics Types ──────────────────────────────────────────────────────
 
-// Auth Types
-export interface UserRegister {
-  email: string
-  password: string
-  full_name: string
-  phone?: string
-}
-
-export interface UserLogin {
-  email: string
-  password: string
-}
-
-export interface UserResponse {
-  id: string
-  email: string
-  full_name: string
-  phone?: string
-  created_at: string
-  updated_at: string
-}
-
-export interface TokenResponse {
-  access_token: string
-  token_type: string
-  expires_in: number
-  refresh_token?: string
-}
-
-// Store Types
-export interface Store {
-  id: string
-  name: string
-  address?: string
-  phone?: string
-  owner_id: string
-  created_at: string
-  updated_at: string
-  table_count?: number
-}
-
-export interface Table {
-  id: string
-  store_id: string
-  label: string
-  capacity: number
-  status: 'available' | 'occupied' | 'reserved'
-}
-
-// Menu Types
-export interface Category {
-  id: string
-  store_id: string
-  name: string
-  description?: string
-  sort_order: number
-}
-
-export interface MenuItem {
-  id: string
-  store_id: string
-  category_id: string
-  name: string
-  description?: string
-  price: number
-  image_url?: string
-  is_available: boolean
-  is_vegetarian?: boolean
-}
-
-export interface AddOn {
-  id: string
-  name: string
-  price: number
-}
-
-// Order Types
-export type OrderStatus = 'pending' | 'confirmed' | 'preparing' | 'ready' | 'served' | 'completed' | 'cancelled'
-export type OrderType = 'dine_in' | 'take_away' | 'delivery'
-export type PaymentMethod = 'cash' | 'card' | 'upi'
-export type PaymentStatus = 'pending' | 'paid' | 'refunded'
-
-export interface OrderItem {
-  id: string
-  order_id: string
-  menu_item_id: string
-  menu_item_name: string
-  quantity: number
-  unit_price: number
-  add_ons?: OrderItemAddOn[]
-  subtotal: number
-}
-
-export interface OrderItemAddOn {
-  name: string
-  price: number
-}
-
-export interface Order {
-  id: string
-  order_number: string
-  store_id: string
-  table_id?: string
-  table_label?: string
-  customer_name?: string
-  customer_phone?: string
-  order_type: OrderType
-  status: OrderStatus
-  items: OrderItem[]
-  subtotal: number
-  tax: number
-  discount: number
-  total: number
-  payment_method?: PaymentMethod
-  payment_status: PaymentStatus
-  created_at: string
-  updated_at: string
-  progress?: number
-}
-
-export interface OrderCreate {
-  store_id: string
-  table_id?: string
-  customer_name?: string
-  customer_phone?: string
-  order_type: OrderType
-  items: {
-    menu_item_id: string
-    quantity: number
-    add_ons?: { name: string; price: number }[]
-  }[]
-}
-
-// Analytics Types
 export interface AnalyticsSummary {
   total_revenue: number
   total_orders: number
+  tax_collected: number
+  gross_sales: number
   net_sales: number
-  cash_payments: number
-  card_payments: number
-  upi_payments: number
-  average_order_value: number
-  period: string
+  total_discounts: number
+  payment_breakdown: Record<string, number>
 }
 
-// API Response wrapper
+// ── Menu Schedule ────────────────────────────────────────────────────────
+
+export interface MenuSchedule {
+  id: string
+  menu_id: string
+  day_of_week: number
+  start_time: string
+  end_time: string
+}
+
+// ── API Response wrapper ─────────────────────────────────────────────────
+
 export interface ApiResponse<T> {
   data: T
   message?: string
 }
 
 export interface PaginatedResponse<T> {
-  data: T[]
+  items: T[]
   total: number
   page: number
-  per_page: number
-  total_pages: number
+  page_size: number
+  pages: number
 }

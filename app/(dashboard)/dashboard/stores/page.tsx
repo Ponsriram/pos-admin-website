@@ -29,46 +29,12 @@ import type { Store } from '@/lib/types'
 import { useStore } from '@/contexts/store-context'
 import { Spinner } from '@/components/ui/spinner'
 
-// Demo data
-const demoStores: Store[] = [
-  {
-    id: '1',
-    name: 'Downtown Kitchen',
-    address: '123 Main Street, Downtown',
-    phone: '+1 (555) 123-4567',
-    owner_id: '1',
-    created_at: '2024-01-15T10:00:00Z',
-    updated_at: '2024-03-10T14:30:00Z',
-    table_count: 15,
-  },
-  {
-    id: '2',
-    name: 'Seaside Bistro',
-    address: '456 Ocean Avenue, Beach District',
-    phone: '+1 (555) 234-5678',
-    owner_id: '1',
-    created_at: '2024-02-01T09:00:00Z',
-    updated_at: '2024-03-08T11:20:00Z',
-    table_count: 20,
-  },
-  {
-    id: '3',
-    name: 'Mountain View Cafe',
-    address: '789 Highland Road, Uptown',
-    phone: '+1 (555) 345-6789',
-    owner_id: '1',
-    created_at: '2024-02-20T08:00:00Z',
-    updated_at: '2024-03-05T16:45:00Z',
-    table_count: 12,
-  },
-]
-
 export default function StoresPage() {
   const [stores, setStores] = useState<Store[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [formData, setFormData] = useState({ name: '', address: '', phone: '' })
+  const [formData, setFormData] = useState({ name: '', location: '', phone: '' })
   const { setCurrentStore } = useStore()
 
   useEffect(() => {
@@ -80,9 +46,9 @@ export default function StoresPage() {
     try {
       const data = await api.getStores()
       setStores(data)
-    } catch {
-      // Use demo data on error
-      setStores(demoStores)
+    } catch (error) {
+      console.error('Failed to fetch stores:', error)
+      setStores([])
     } finally {
       setIsLoading(false)
     }
@@ -95,20 +61,9 @@ export default function StoresPage() {
       const newStore = await api.createStore(formData)
       setStores((prev) => [...prev, newStore])
       setIsDialogOpen(false)
-      setFormData({ name: '', address: '', phone: '' })
-    } catch {
-      // Demo: add fake store
-      const fakeStore: Store = {
-        id: String(stores.length + 1),
-        ...formData,
-        owner_id: '1',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        table_count: 0,
-      }
-      setStores((prev) => [...prev, fakeStore])
-      setIsDialogOpen(false)
-      setFormData({ name: '', address: '', phone: '' })
+      setFormData({ name: '', location: '', phone: '' })
+    } catch (error) {
+      console.error('Failed to create store:', error)
     } finally {
       setIsSubmitting(false)
     }
@@ -118,9 +73,8 @@ export default function StoresPage() {
     try {
       await api.deleteStore(id)
       setStores((prev) => prev.filter((s) => s.id !== id))
-    } catch {
-      // Demo: remove locally
-      setStores((prev) => prev.filter((s) => s.id !== id))
+    } catch (error) {
+      console.error('Failed to delete store:', error)
     }
   }
 
@@ -142,12 +96,12 @@ export default function StoresPage() {
       ),
     },
     {
-      accessorKey: 'address',
+      accessorKey: 'location',
       header: 'Location',
       cell: ({ row }) => (
         <div className="flex items-center gap-2 text-muted-foreground">
           <MapPin className="h-4 w-4 shrink-0" />
-          <span className="truncate max-w-[200px]">{row.getValue('address') || 'No address'}</span>
+          <span className="truncate max-w-[200px]">{row.getValue('location') || 'No location'}</span>
         </div>
       ),
     },
@@ -252,11 +206,11 @@ export default function StoresPage() {
                 />
               </Field>
               <Field>
-                <FieldLabel>Address</FieldLabel>
+                <FieldLabel>Location</FieldLabel>
                 <Input
                   placeholder="e.g., 123 Main Street"
-                  value={formData.address}
-                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                  value={formData.location}
+                  onChange={(e) => setFormData({ ...formData, location: e.target.value })}
                 />
               </Field>
               <Field>

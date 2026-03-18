@@ -2,13 +2,13 @@
 
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react'
 import { api } from '@/lib/api'
-import type { Store, Table } from '@/lib/types'
+import type { Store, TableLabel } from '@/lib/types'
 import { useAuth } from './auth-context'
 
 interface StoreContextType {
   stores: Store[]
   currentStore: Store | null
-  tables: Table[]
+  tables: TableLabel[]
   isLoading: boolean
   setCurrentStore: (store: Store) => void
   refreshStores: () => Promise<void>
@@ -20,7 +20,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const { isAuthenticated } = useAuth()
   const [stores, setStores] = useState<Store[]>([])
   const [currentStore, setCurrentStoreState] = useState<Store | null>(null)
-  const [tables, setTables] = useState<Table[]>([])
+  const [tables, setTables] = useState<TableLabel[]>([])
   const [isLoading, setIsLoading] = useState(false)
 
   const refreshStores = useCallback(async () => {
@@ -51,8 +51,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         return
       }
       try {
-        const tableList = await api.getStoreTables(currentStore.id)
-        setTables(tableList)
+        const response = await api.getStoreTables(currentStore.id)
+        setTables(response.tables || [])
       } catch (error) {
         console.error('Failed to fetch tables:', error)
         setTables([])

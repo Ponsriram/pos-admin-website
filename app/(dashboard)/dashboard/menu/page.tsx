@@ -49,32 +49,13 @@ import { useStore } from '@/contexts/store-context'
 import { Spinner } from '@/components/ui/spinner'
 import { cn } from '@/lib/utils'
 
-const demoCategories: Category[] = [
-  { id: '1', store_id: '1', name: 'Appetizers', description: 'Start your meal right', sort_order: 1 },
-  { id: '2', store_id: '1', name: 'Main Course', description: 'Signature dishes', sort_order: 2 },
-  { id: '3', store_id: '1', name: 'Noodles & Rice', description: 'Asian favorites', sort_order: 3 },
-  { id: '4', store_id: '1', name: 'Desserts', description: 'Sweet endings', sort_order: 4 },
-  { id: '5', store_id: '1', name: 'Beverages', description: 'Drinks and refreshments', sort_order: 5 },
-]
 
-const demoMenuItems: MenuItem[] = [
-  { id: '1', store_id: '1', category_id: '1', name: 'Grilled Lobster', description: 'Delicious baked lobster', price: 32.00, image_url: '/api/placeholder/200/200', is_available: true, is_vegetarian: false },
-  { id: '2', store_id: '1', category_id: '2', name: 'Beef Wellington', description: 'Tender beef in pastry', price: 26.30, image_url: '/api/placeholder/200/200', is_available: true, is_vegetarian: false },
-  { id: '3', store_id: '1', category_id: '2', name: 'Scallops Sauce', description: 'Seared scallops with sauce', price: 25.30, image_url: '/api/placeholder/200/200', is_available: true, is_vegetarian: false },
-  { id: '4', store_id: '1', category_id: '2', name: 'Sea Urchin', description: 'Fresh sea urchin served', price: 19.00, image_url: '/api/placeholder/200/200', is_available: true, is_vegetarian: false },
-  { id: '5', store_id: '1', category_id: '2', name: 'Peking Chicken', description: 'Crispy roasted chicken', price: 18.00, image_url: '/api/placeholder/200/200', is_available: true, is_vegetarian: false },
-  { id: '6', store_id: '1', category_id: '2', name: 'Wagyu Steak', description: 'Juicy premium wagyu beef', price: 27.50, image_url: '/api/placeholder/200/200', is_available: true, is_vegetarian: false },
-  { id: '7', store_id: '1', category_id: '3', name: 'Cod Miso', description: 'Grilled black cod with miso', price: 23.20, image_url: '/api/placeholder/200/200', is_available: true, is_vegetarian: false },
-  { id: '8', store_id: '1', category_id: '2', name: 'Duck Orange', description: 'Classic roasted duck dish', price: 21.50, image_url: '/api/placeholder/200/200', is_available: true, is_vegetarian: false },
-  { id: '9', store_id: '1', category_id: '4', name: 'Chocolate Lava Cake', description: 'Rich chocolate dessert', price: 12.00, image_url: '/api/placeholder/200/200', is_available: true, is_vegetarian: true },
-  { id: '10', store_id: '1', category_id: '5', name: 'Fresh Lemonade', description: 'Refreshing citrus drink', price: 5.00, image_url: '/api/placeholder/200/200', is_available: true, is_vegetarian: true },
-]
 
 export default function MenuPage() {
   const searchParams = useSearchParams()
   const storeIdParam = searchParams.get('store_id')
   const { currentStore } = useStore()
-  const storeId = storeIdParam || currentStore?.id || '1'
+  const storeId = storeIdParam || currentStore?.id
 
   const [categories, setCategories] = useState<Category[]>([])
   const [menuItems, setMenuItems] = useState<MenuItem[]>([])
@@ -98,10 +79,11 @@ export default function MenuPage() {
   })
 
   useEffect(() => {
-    loadData()
+    if (storeId) loadData()
   }, [storeId])
 
   const loadData = async () => {
+    if (!storeId) return
     setIsLoading(true)
     try {
       const [categoriesData, itemsData] = await Promise.all([
@@ -110,9 +92,10 @@ export default function MenuPage() {
       ])
       setCategories(categoriesData)
       setMenuItems(itemsData)
-    } catch {
-      setCategories(demoCategories)
-      setMenuItems(demoMenuItems)
+    } catch (error) {
+      console.error('Failed to load menu:', error)
+      setCategories([])
+      setMenuItems([])
     } finally {
       setIsLoading(false)
     }
@@ -123,7 +106,7 @@ export default function MenuPage() {
     : menuItems
 
   const handleCreateCategory = async () => {
-    if (!categoryForm.name) return
+    if (!categoryForm.name || !storeId) return
     setIsSubmitting(true)
     try {
       const newCategory = await api.createCategory(storeId, {
@@ -134,59 +117,46 @@ export default function MenuPage() {
       setCategories((prev) => [...prev, newCategory])
       setIsCategoryDialogOpen(false)
       setCategoryForm({ name: '', description: '' })
-    } catch {
-      const fakeCategory: Category = {
-        id: String(categories.length + 1),
-        store_id: storeId,
-        ...categoryForm,
-        sort_order: categories.length + 1,
-      }
-      setCategories((prev) => [...prev, fakeCategory])
-      setIsCategoryDialogOpen(false)
-      setCategoryForm({ name: '', description: '' })
+    } catch (error) {
+      console.error('Failed to create category:', error)
     } finally {
       setIsSubmitting(false)
     }
   }
 
   const handleUpdateCategory = async () => {
-    if (!editingCategory) return
+    if (!editingCategory || !storeId) return
     setIsSubmitting(true)
     try {
       const updated = await api.updateCategory(storeId, editingCategory.id, categoryForm)
       setCategories((prev) => prev.map((c) => (c.id === editingCategory.id ? updated : c)))
       setEditingCategory(null)
       setCategoryForm({ name: '', description: '' })
-    } catch {
-      setCategories((prev) =>
-        prev.map((c) => (c.id === editingCategory.id ? { ...c, ...categoryForm } : c))
-      )
-      setEditingCategory(null)
-      setCategoryForm({ name: '', description: '' })
+    } catch (error) {
+      console.error('Failed to update category:', error)
     } finally {
       setIsSubmitting(false)
     }
   }
 
   const handleDeleteCategory = async (id: string) => {
+    if (!storeId) return
     try {
       await api.deleteCategory(storeId, id)
       setCategories((prev) => prev.filter((c) => c.id !== id))
       if (selectedCategory?.id === id) {
         setSelectedCategory(null)
       }
-    } catch {
-      setCategories((prev) => prev.filter((c) => c.id !== id))
-      if (selectedCategory?.id === id) {
-        setSelectedCategory(null)
-      }
+    } catch (error) {
+      console.error('Failed to delete category:', error)
     }
   }
 
   const handleCreateItem = async () => {
     if (!itemForm.name || !itemForm.price) return
     setIsSubmitting(true)
-    const categoryId = selectedCategory?.id || categories[0]?.id || '1'
+    const categoryId = selectedCategory?.id || categories[0]?.id
+    if (!categoryId || !storeId) return
     try {
       const newItem = await api.createMenuItem(storeId, {
         category_id: categoryId,
@@ -200,28 +170,15 @@ export default function MenuPage() {
       setMenuItems((prev) => [...prev, newItem])
       setIsItemDialogOpen(false)
       resetItemForm()
-    } catch {
-      const fakeItem: MenuItem = {
-        id: String(menuItems.length + 1),
-        store_id: storeId,
-        category_id: categoryId,
-        name: itemForm.name,
-        description: itemForm.description,
-        price: parseFloat(itemForm.price),
-        image_url: itemForm.image_url || '/api/placeholder/200/200',
-        is_available: itemForm.is_available,
-        is_vegetarian: itemForm.is_vegetarian,
-      }
-      setMenuItems((prev) => [...prev, fakeItem])
-      setIsItemDialogOpen(false)
-      resetItemForm()
+    } catch (error) {
+      console.error('Failed to create menu item:', error)
     } finally {
       setIsSubmitting(false)
     }
   }
 
   const handleUpdateItem = async () => {
-    if (!editingItem) return
+    if (!editingItem || !storeId) return
     setIsSubmitting(true)
     try {
       const updated = await api.updateMenuItem(storeId, editingItem.id, {
@@ -236,54 +193,42 @@ export default function MenuPage() {
       setEditingItem(null)
       setIsItemDialogOpen(false)
       resetItemForm()
-    } catch {
-      setMenuItems((prev) =>
-        prev.map((i) =>
-          i.id === editingItem.id
-            ? {
-                ...i,
-                ...itemForm,
-                price: parseFloat(itemForm.price),
-              }
-            : i
-        )
-      )
-      setEditingItem(null)
-      setIsItemDialogOpen(false)
-      resetItemForm()
+    } catch (error) {
+      console.error('Failed to update menu item:', error)
     } finally {
       setIsSubmitting(false)
     }
   }
 
   const handleDeleteItem = async (id: string) => {
+    if (!storeId) return
     try {
       await api.deleteMenuItem(storeId, id)
       setMenuItems((prev) => prev.filter((i) => i.id !== id))
-    } catch {
-      setMenuItems((prev) => prev.filter((i) => i.id !== id))
+    } catch (error) {
+      console.error('Failed to delete menu item:', error)
     }
   }
 
   const handleToggleItemAvailability = async (item: MenuItem) => {
+    if (!storeId) return
     try {
       await api.updateMenuItem(storeId, item.id, { is_available: !item.is_available })
       setMenuItems((prev) =>
         prev.map((i) => (i.id === item.id ? { ...i, is_available: !i.is_available } : i))
       )
-    } catch {
-      setMenuItems((prev) =>
-        prev.map((i) => (i.id === item.id ? { ...i, is_available: !i.is_available } : i))
-      )
+    } catch (error) {
+      console.error('Failed to toggle item availability:', error)
     }
   }
 
   const handleBulkToggle = async (available: boolean) => {
+    if (!storeId) return
     const ids = selectedItems.map((i) => i.id)
     try {
       await api.bulkUpdateMenuItems(storeId, ids, { is_available: available })
-    } catch {
-      // Continue anyway for demo
+    } catch (error) {
+      console.error('Failed to bulk update menu items:', error)
     }
     setMenuItems((prev) =>
       prev.map((i) => (ids.includes(i.id) ? { ...i, is_available: available } : i))

@@ -6,9 +6,7 @@ import type {
   Store,
   StoreCreate,
   StoreUpdate,
-  Table,
-  TableCreate,
-  TableUpdate,
+  StoreTablesResponse,
   Category,
   CategoryCreate,
   CategoryUpdate,
@@ -28,7 +26,7 @@ import type {
   Payment,
 } from './types'
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.example.com'
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
 class ApiClient {
   private baseUrl: string
@@ -51,7 +49,6 @@ class ApiClient {
   private clearToken(): void {
     if (typeof window !== 'undefined') {
       localStorage.removeItem('access_token')
-      localStorage.removeItem('refresh_token')
     }
   }
 
@@ -60,9 +57,9 @@ class ApiClient {
     options: RequestInit = {}
   ): Promise<T> {
     const token = this.getToken()
-    const headers: HeadersInit = {
+    const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-      ...options.headers,
+      ...(options.headers as Record<string, string>),
     }
 
     if (token) {
@@ -99,37 +96,39 @@ class ApiClient {
       throw new Error(error.detail || `API Error: ${response.status}`)
     }
 
+    // Handle 204 No Content
+    if (response.status === 204) {
+      return undefined as unknown as T
+    }
+
     return response.json()
   }
 
   private async refreshToken(): Promise<boolean> {
-    const refreshToken = typeof window !== 'undefined' 
-      ? localStorage.getItem('refresh_token') 
-      : null
-    
-    if (!refreshToken) return false
+    const token = this.getToken()
+    if (!token) return false
 
     try {
       const response = await fetch(`${this.baseUrl}/auth/refresh`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refresh_token: refreshToken }),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
       })
 
       if (!response.ok) return false
 
       const data: TokenResponse = await response.json()
       this.setToken(data.access_token)
-      if (data.refresh_token) {
-        localStorage.setItem('refresh_token', data.refresh_token)
-      }
       return true
     } catch {
       return false
     }
   }
 
-  // Auth endpoints
+  // ── Auth endpoints ──────────────────────────────────────────────────────
+
   async register(data: UserRegister): Promise<UserResponse> {
     return this.request<UserResponse>('/auth/register', {
       method: 'POST',
@@ -143,9 +142,6 @@ class ApiClient {
       body: JSON.stringify(data),
     })
     this.setToken(response.access_token)
-    if (response.refresh_token) {
-      localStorage.setItem('refresh_token', response.refresh_token)
-    }
     return response
   }
 
@@ -157,7 +153,8 @@ class ApiClient {
     return this.request<UserResponse>('/users/me')
   }
 
-  // Store endpoints
+  // ── Store endpoints ─────────────────────────────────────────────────────
+
   async getStores(): Promise<Store[]> {
     return this.request<Store[]>('/stores')
   }
@@ -166,54 +163,6 @@ class ApiClient {
     return this.request<Store>(`/stores/${id}`)
   }
 
-  async getStoreTables(storeId: string): Promise<Table[]> {
-    return this.request<Table[]>(`/stores/${storeId}/tables`)
-  }
-
-  // Menu endpoints
-  async getCategories(storeId: string): Promise<Category[]> {
-    return this.request<Category[]>(`/stores/${storeId}/categories`)
-  }
-
-  async getMenuItems(storeId: string, categoryId?: string): Promise<MenuItem[]> {
-    const params = categoryId ? `?category_id=${categoryId}` : ''
-    return this.request<MenuItem[]>(`/stores/${storeId}/menu-items${params}`)
-  }
-
-  // Order endpoints
-  async getOrders(storeId: string, status?: string): Promise<Order[]> {
-    const params = status ? `?status=${status}` : ''
-    return this.request<Order[]>(`/stores/${storeId}/orders${params}`)
-  }
-
-  async getOrder(storeId: string, orderId: string): Promise<Order> {
-    return this.request<Order>(`/stores/${storeId}/orders/${orderId}`)
-  }
-
-  async createOrder(data: OrderCreate): Promise<Order> {
-    return this.request<Order>(`/stores/${data.store_id}/orders`, {
-      method: 'POST',
-      body: JSON.stringify(data),
-    })
-  }
-
-  async updateOrderStatus(storeId: string, orderId: string, status: string): Promise<Order> {
-    return this.request<Order>(`/stores/${storeId}/orders/${orderId}/status`, {
-      method: 'PATCH',
-      body: JSON.stringify({ status }),
-    })
-  }
-
-  // Analytics endpoints
-  async getAnalyticsSummary(storeId: string): Promise<AnalyticsSummary> {
-    return this.request<AnalyticsSummary>(`/analytics/summary?store_id=${storeId}`)
-  }
-
-  async getAnalyticsByStore(): Promise<Record<string, AnalyticsSummary>> {
-    return this.request<Record<string, AnalyticsSummary>>('/analytics/summary/by-store')
-  }
-
-  // Store CRUD
   async createStore(data: StoreCreate): Promise<Store> {
     return this.request<Store>('/stores', {
       method: 'POST',
@@ -232,58 +181,55 @@ class ApiClient {
     return this.request<void>(`/stores/${id}`, { method: 'DELETE' })
   }
 
-  // Table CRUD
-  async createTable(storeId: string, data: TableCreate): Promise<Table> {
-    return this.request<Table>(`/stores/${storeId}/tables`, {
-      method: 'POST',
-      body: JSON.stringify(data),
-    })
+  // ── Table endpoints (dynamic from table_count) ──────────────────────────
+
+  async getStoreTables(storeId: string): Promise<StoreTablesResponse> {
+    return this.request<StoreTablesResponse>(`/stores/${storeId}/tables`)
   }
 
-  async updateTable(storeId: string, tableId: string, data: TableUpdate): Promise<Table> {
-    return this.request<Table>(`/stores/${storeId}/tables/${tableId}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    })
-  }
+  // ── Employee endpoints ──────────────────────────────────────────────────
 
-  async deleteTable(storeId: string, tableId: string): Promise<void> {
-    return this.request<void>(`/stores/${storeId}/tables/${tableId}`, { method: 'DELETE' })
-  }
-
-  // Employee endpoints
   async getEmployees(storeId: string): Promise<Employee[]> {
-    return this.request<Employee[]>(`/stores/${storeId}/employees`)
+    return this.request<Employee[]>(`/employees?store_id=${storeId}`)
   }
 
   async getEmployee(storeId: string, employeeId: string): Promise<Employee> {
-    return this.request<Employee>(`/stores/${storeId}/employees/${employeeId}`)
+    return this.request<Employee>(`/employees/${employeeId}?store_id=${storeId}`)
   }
 
   async createEmployee(storeId: string, data: EmployeeCreate): Promise<Employee> {
-    return this.request<Employee>(`/stores/${storeId}/employees`, {
+    return this.request<Employee>(`/employees?store_id=${storeId}`, {
       method: 'POST',
-      body: JSON.stringify(data),
+      body: JSON.stringify({ ...data, store_id: storeId }),
     })
   }
 
   async updateEmployee(storeId: string, employeeId: string, data: EmployeeUpdate): Promise<Employee> {
-    return this.request<Employee>(`/stores/${storeId}/employees/${employeeId}`, {
+    return this.request<Employee>(`/employees/${employeeId}?store_id=${storeId}`, {
       method: 'PUT',
       body: JSON.stringify(data),
     })
   }
 
   async deleteEmployee(storeId: string, employeeId: string): Promise<void> {
-    return this.request<void>(`/stores/${storeId}/employees/${employeeId}`, { method: 'DELETE' })
+    return this.request<void>(`/employees/${employeeId}?store_id=${storeId}`, { method: 'DELETE' })
   }
 
-  // Permission Groups
+  // ── Permission Groups ───────────────────────────────────────────────────
+
   async getPermissionGroups(): Promise<PermissionGroup[]> {
     return this.request<PermissionGroup[]>('/groups')
   }
 
-  // Category CRUD
+  // ── Menu/Category endpoints ─────────────────────────────────────────────
+  // Note: Backend uses /menus structure. These map to the available endpoints.
+  // Categories don't have a direct backend equivalent yet — these calls will
+  // gracefully fail until the backend is updated.
+
+  async getCategories(storeId: string): Promise<Category[]> {
+    return this.request<Category[]>(`/stores/${storeId}/categories`)
+  }
+
   async createCategory(storeId: string, data: CategoryCreate): Promise<Category> {
     return this.request<Category>(`/stores/${storeId}/categories`, {
       method: 'POST',
@@ -309,7 +255,13 @@ class ApiClient {
     })
   }
 
-  // Menu Item CRUD
+  // ── Menu Item endpoints ─────────────────────────────────────────────────
+
+  async getMenuItems(storeId: string, categoryId?: string): Promise<MenuItem[]> {
+    const params = categoryId ? `?category_id=${categoryId}` : ''
+    return this.request<MenuItem[]>(`/stores/${storeId}/menu-items${params}`)
+  }
+
   async createMenuItem(storeId: string, data: MenuItemCreate): Promise<MenuItem> {
     return this.request<MenuItem>(`/stores/${storeId}/menu-items`, {
       method: 'POST',
@@ -342,15 +294,51 @@ class ApiClient {
     })
   }
 
-  // KOT endpoints
+  // ── Order endpoints ─────────────────────────────────────────────────────
+
+  async getOrders(storeId: string, status?: string): Promise<Order[]> {
+    const params = new URLSearchParams({ store_id: storeId })
+    if (status) params.append('status', status)
+    return this.request<Order[]>(`/orders?${params.toString()}`)
+  }
+
+  async getOrder(storeId: string, orderId: string): Promise<Order> {
+    return this.request<Order>(`/orders/${orderId}?store_id=${storeId}`)
+  }
+
+  async createOrder(data: OrderCreate): Promise<Order> {
+    return this.request<Order>(`/orders?store_id=${data.store_id}`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  }
+
+  async updateOrderStatus(storeId: string, orderId: string, status: string): Promise<Order> {
+    return this.request<Order>(`/orders/${orderId}/status?store_id=${storeId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ status }),
+    })
+  }
+
+  // ── Analytics endpoints ─────────────────────────────────────────────────
+
+  async getAnalyticsSummary(storeId: string): Promise<AnalyticsSummary> {
+    return this.request<AnalyticsSummary>(`/analytics/summary?store_id=${storeId}`)
+  }
+
+  async getAnalyticsByStore(): Promise<Record<string, AnalyticsSummary>> {
+    return this.request<Record<string, AnalyticsSummary>>('/analytics/summary/by-store')
+  }
+
+  // ── KOT endpoints ──────────────────────────────────────────────────────
+
   async getKOTs(storeId: string): Promise<KOT[]> {
     return this.request<KOT[]>(`/stores/${storeId}/kots`)
   }
 
   async createKOT(storeId: string, orderId: string): Promise<KOT> {
-    return this.request<KOT>(`/stores/${storeId}/kots`, {
+    return this.request<KOT>(`/orders/${orderId}/kot?store_id=${storeId}`, {
       method: 'POST',
-      body: JSON.stringify({ order_id: orderId }),
     })
   }
 
@@ -361,28 +349,36 @@ class ApiClient {
     })
   }
 
-  // Inventory endpoints
+  // ── Inventory endpoints ─────────────────────────────────────────────────
+
   async getInventory(storeId: string): Promise<InventoryItem[]> {
     return this.request<InventoryItem[]>(`/stores/${storeId}/inventory/stock`)
   }
 
-  // Order Timeline & Payments
+  // ── Order Timeline & Payments ───────────────────────────────────────────
+
   async getOrderTimeline(storeId: string, orderId: string): Promise<OrderTimelineEvent[]> {
     return this.request<OrderTimelineEvent[]>(`/stores/${storeId}/orders/${orderId}/timeline`)
   }
 
   async getOrderPayments(storeId: string, orderId: string): Promise<Payment[]> {
-    return this.request<Payment[]>(`/stores/${storeId}/orders/${orderId}/payments`)
+    return this.request<Payment[]>(`/orders/${orderId}/payments?store_id=${storeId}`)
   }
 
   async createPayment(storeId: string, orderId: string, data: { amount: number; method: string }): Promise<Payment> {
-    return this.request<Payment>(`/stores/${storeId}/orders/${orderId}/payments`, {
+    return this.request<Payment>(`/orders/${orderId}/payments?store_id=${storeId}`, {
       method: 'POST',
-      body: JSON.stringify(data),
+      body: JSON.stringify({
+        order_id: orderId,
+        payment_method: data.method,
+        amount: data.amount,
+        tip_amount: 0,
+      }),
     })
   }
 
-  // Bulk order actions
+  // ── Bulk order actions ──────────────────────────────────────────────────
+
   async bulkUpdateOrders(storeId: string, orderIds: string[], status: string): Promise<void> {
     return this.request<void>(`/stores/${storeId}/orders/bulk`, {
       method: 'PUT',

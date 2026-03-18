@@ -57,11 +57,10 @@ export default function DashboardPage() {
   }, [currentStore])
 
   const paymentData = analytics
-    ? [
-        { name: 'Cash', value: analytics.cash_payments },
-        { name: 'Card', value: analytics.card_payments },
-        { name: 'UPI', value: analytics.upi_payments },
-      ]
+    ? Object.entries(analytics.payment_breakdown || {}).map(([name, value]) => ({
+        name: name.charAt(0).toUpperCase() + name.slice(1),
+        value,
+      }))
     : []
 
   const formatCurrency = (value: number) => {
@@ -124,8 +123,8 @@ export default function DashboardPage() {
           isLoading={isLoading}
         />
         <MetricCard
-          title="Cash Payments"
-          value={analytics ? formatCurrency(analytics.cash_payments) : '-'}
+          title="Tax Collected"
+          value={analytics ? formatCurrency(analytics.tax_collected) : '-'}
           icon={Banknote}
           isLoading={isLoading}
         />
@@ -223,7 +222,7 @@ export default function DashboardPage() {
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className="font-medium">{formatCurrency(order.total)}</p>
+                      <p className="font-medium">{formatCurrency(order.net_amount || order.total || 0)}</p>
                       <span
                         className={`text-xs px-2 py-0.5 rounded-full ${
                           order.status === 'completed'

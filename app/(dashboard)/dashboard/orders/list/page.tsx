@@ -60,118 +60,15 @@ const statusOptions: { value: OrderStatus | 'all'; label: string }[] = [
 const typeOptions: { value: OrderType | 'all'; label: string }[] = [
   { value: 'all', label: 'All Types' },
   { value: 'dine_in', label: 'Dine In' },
-  { value: 'take_away', label: 'Take Away' },
+  { value: 'takeaway', label: 'Take Away' },
   { value: 'delivery', label: 'Delivery' },
-]
-
-const demoOrders: Order[] = [
-  {
-    id: '1',
-    order_number: '231128421',
-    store_id: '1',
-    table_label: 'Table 03',
-    customer_name: 'Budianto Siregar',
-    order_type: 'dine_in',
-    status: 'preparing',
-    items: [
-      { id: '1', order_id: '1', menu_item_id: '1', menu_item_name: 'Grilled Lobster', quantity: 1, unit_price: 32, subtotal: 32 },
-      { id: '2', order_id: '1', menu_item_id: '2', menu_item_name: 'Beef Wellington', quantity: 2, unit_price: 26.30, subtotal: 52.60 },
-    ],
-    subtotal: 84.60,
-    tax: 6.09,
-    discount: 0,
-    total: 90.69,
-    payment_status: 'pending',
-    created_at: '2025-10-05T11:32:00Z',
-    updated_at: '2025-10-05T11:32:00Z',
-    progress: 60,
-  },
-  {
-    id: '2',
-    order_number: '231128422',
-    store_id: '1',
-    table_label: 'Table 08',
-    customer_name: 'Theresa Webb',
-    order_type: 'dine_in',
-    status: 'ready',
-    items: [
-      { id: '3', order_id: '2', menu_item_id: '3', menu_item_name: 'Scallops Sauce', quantity: 1, unit_price: 25.30, subtotal: 25.30 },
-    ],
-    subtotal: 25.30,
-    tax: 1.82,
-    discount: 0,
-    total: 27.12,
-    payment_status: 'pending',
-    created_at: '2025-10-05T11:42:00Z',
-    updated_at: '2025-10-05T11:42:00Z',
-    progress: 100,
-  },
-  {
-    id: '3',
-    order_number: '231128423',
-    store_id: '1',
-    table_label: 'Table 10',
-    customer_name: 'Jerome Bell',
-    order_type: 'take_away',
-    status: 'completed',
-    items: [
-      { id: '5', order_id: '3', menu_item_id: '6', menu_item_name: 'Wagyu Steak', quantity: 1, unit_price: 27.50, subtotal: 27.50 },
-    ],
-    subtotal: 27.50,
-    tax: 1.98,
-    discount: 2.50,
-    total: 26.98,
-    payment_status: 'paid',
-    payment_method: 'card',
-    created_at: '2025-10-05T10:15:00Z',
-    updated_at: '2025-10-05T10:45:00Z',
-  },
-  {
-    id: '4',
-    order_number: '231128424',
-    store_id: '1',
-    customer_name: 'Sarah Johnson',
-    customer_phone: '+1 555-1234',
-    order_type: 'delivery',
-    status: 'pending',
-    items: [
-      { id: '6', order_id: '4', menu_item_id: '5', menu_item_name: 'Peking Chicken', quantity: 2, unit_price: 18, subtotal: 36 },
-      { id: '7', order_id: '4', menu_item_id: '8', menu_item_name: 'Duck Orange', quantity: 1, unit_price: 21.50, subtotal: 21.50 },
-    ],
-    subtotal: 57.50,
-    tax: 4.14,
-    discount: 0,
-    total: 61.64,
-    payment_status: 'pending',
-    created_at: '2025-10-05T12:00:00Z',
-    updated_at: '2025-10-05T12:00:00Z',
-  },
-  {
-    id: '5',
-    order_number: '231128425',
-    store_id: '1',
-    table_label: 'Table 05',
-    customer_name: 'Mike Wilson',
-    order_type: 'dine_in',
-    status: 'cancelled',
-    items: [
-      { id: '8', order_id: '5', menu_item_id: '1', menu_item_name: 'Grilled Lobster', quantity: 1, unit_price: 32, subtotal: 32 },
-    ],
-    subtotal: 32,
-    tax: 2.30,
-    discount: 0,
-    total: 34.30,
-    payment_status: 'refunded',
-    created_at: '2025-10-05T09:30:00Z',
-    updated_at: '2025-10-05T09:45:00Z',
-  },
 ]
 
 export default function OrdersListPage() {
   const searchParams = useSearchParams()
   const storeIdParam = searchParams.get('store_id')
   const { currentStore } = useStore()
-  const storeId = storeIdParam || currentStore?.id || '1'
+  const storeId = storeIdParam || currentStore?.id
 
   const [orders, setOrders] = useState<Order[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -181,46 +78,56 @@ export default function OrdersListPage() {
   const [selectedOrders, setSelectedOrders] = useState<Order[]>([])
 
   useEffect(() => {
-    loadOrders()
+    if (storeId) loadOrders()
   }, [storeId, statusFilter])
 
   const loadOrders = async () => {
+    if (!storeId) return
     setIsLoading(true)
     try {
       const status = statusFilter !== 'all' ? statusFilter : undefined
       const data = await api.getOrders(storeId, status)
       setOrders(data)
-    } catch {
-      setOrders(demoOrders)
+    } catch (error) {
+      console.error('Failed to fetch orders:', error)
+      setOrders([])
     } finally {
       setIsLoading(false)
     }
   }
 
   const handleUpdateStatus = async (orderId: string, status: OrderStatus) => {
+    if (!storeId) return
     try {
       await api.updateOrderStatus(storeId, orderId, status)
       setOrders((prev) =>
         prev.map((o) => (o.id === orderId ? { ...o, status } : o))
       )
-    } catch {
-      setOrders((prev) =>
-        prev.map((o) => (o.id === orderId ? { ...o, status } : o))
-      )
+    } catch (error) {
+      console.error('Failed to update order status:', error)
     }
   }
 
   const handleBulkUpdateStatus = async (status: OrderStatus) => {
+    if (!storeId) return
     const ids = selectedOrders.map((o) => o.id)
     try {
       await api.bulkUpdateOrders(storeId, ids, status)
-    } catch {
-      // Continue for demo
+    } catch (error) {
+      console.error('Failed to bulk update orders:', error)
     }
     setOrders((prev) =>
       prev.map((o) => (ids.includes(o.id) ? { ...o, status } : o))
     )
     setSelectedOrders([])
+  }
+
+  if (!storeId) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <p className="text-muted-foreground">Please select a store to view orders</p>
+      </div>
+    )
   }
 
   // Apply filters
@@ -233,10 +140,10 @@ export default function OrdersListPage() {
     return true
   })
 
-  // Stats
+  // Stats — use net_amount with fallback to total
   const totalRevenue = filteredOrders
-    .filter((o) => o.payment_status === 'paid')
-    .reduce((sum, o) => sum + o.total, 0)
+    .filter((o) => o.payment_status === 'completed' || o.payment_status === 'paid')
+    .reduce((sum, o) => sum + (o.net_amount || o.total || 0), 0)
   const totalOrders = filteredOrders.length
   const pendingOrders = filteredOrders.filter((o) => o.status === 'pending').length
   const completedOrders = filteredOrders.filter((o) => o.status === 'completed').length
@@ -258,20 +165,22 @@ export default function OrdersListPage() {
     )
   }
 
-  const getTypeBadge = (type: OrderType) => {
-    const styles: Record<OrderType, string> = {
+  const getTypeBadge = (type: string) => {
+    const styles: Record<string, string> = {
       dine_in: 'bg-primary/10 text-primary',
+      takeaway: 'bg-purple-500/10 text-purple-600',
       take_away: 'bg-purple-500/10 text-purple-600',
       delivery: 'bg-indigo-500/10 text-indigo-600',
     }
-    const labels: Record<OrderType, string> = {
+    const labels: Record<string, string> = {
       dine_in: 'Dine In',
+      takeaway: 'Take Away',
       take_away: 'Take Away',
       delivery: 'Delivery',
     }
     return (
-      <Badge variant="outline" className={cn('capitalize', styles[type])}>
-        {labels[type]}
+      <Badge variant="outline" className={cn('capitalize', styles[type] || '')}>
+        {labels[type] || type}
       </Badge>
     )
   }
@@ -319,7 +228,7 @@ export default function OrdersListPage() {
       accessorKey: 'items',
       header: 'Items',
       cell: ({ row }) => {
-        const items = row.original.items
+        const items = row.original.items || []
         return (
           <span className="text-muted-foreground">
             {items.reduce((sum, i) => sum + i.quantity, 0)} items
@@ -328,13 +237,17 @@ export default function OrdersListPage() {
       },
     },
     {
-      accessorKey: 'total',
+      accessorKey: 'net_amount',
       header: 'Total',
-      cell: ({ row }) => (
-        <span className="font-medium">
-          ${(row.getValue('total') as number).toFixed(2)}
-        </span>
-      ),
+      cell: ({ row }) => {
+        const order = row.original
+        const amount = order.net_amount || order.total || 0
+        return (
+          <span className="font-medium">
+            ${amount.toFixed(2)}
+          </span>
+        )
+      },
     },
     {
       accessorKey: 'status',
@@ -346,10 +259,11 @@ export default function OrdersListPage() {
       header: 'Payment',
       cell: ({ row }) => {
         const status = row.original.payment_status
+        const isPaid = status === 'completed' || status === 'paid'
         return (
           <Badge
-            variant={status === 'paid' ? 'default' : 'secondary'}
-            className={status === 'paid' ? 'bg-green-500/10 text-green-600' : ''}
+            variant={isPaid ? 'default' : 'secondary'}
+            className={isPaid ? 'bg-green-500/10 text-green-600' : ''}
           >
             {status}
           </Badge>
