@@ -19,7 +19,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Bell, MoreHorizontal, ChevronDown } from 'lucide-react'
+import { Bell, ChevronDown } from 'lucide-react'
+import Link from 'next/link'
 
 export function Header() {
   const { user, logout } = useAuth()
@@ -59,15 +60,12 @@ export function Header() {
 
       <div className="flex items-center gap-3">
         {/* Notifications */}
-        <Button variant="ghost" size="icon" className="relative">
-          <Bell className="h-5 w-5" />
-          <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-primary" />
-        </Button>
-
-        {/* More actions */}
-        <Button variant="ghost" size="icon">
-          <MoreHorizontal className="h-5 w-5" />
-        </Button>
+        <Link href="/dashboard/notifications">
+          <Button variant="ghost" size="icon" className="relative">
+            <Bell className="h-5 w-5" />
+            <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-primary" />
+          </Button>
+        </Link>
 
         {/* User menu */}
         <DropdownMenu>
@@ -94,10 +92,11 @@ export function Header() {
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>Profile Settings</DropdownMenuItem>
-            <DropdownMenuItem>Billing</DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href="/dashboard/settings">Profile Settings</Link>
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={logout} className="text-destructive">
+            <DropdownMenuItem onClick={logout} className="text-destructive focus:text-destructive">
               Logout
             </DropdownMenuItem>
           </DropdownMenuContent>

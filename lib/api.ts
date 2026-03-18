@@ -16,6 +16,7 @@ import type {
   Order,
   OrderCreate,
   AnalyticsSummary,
+  OutletAnalyticsResponse,
   Employee,
   EmployeeCreate,
   EmployeeUpdate,
@@ -24,6 +25,13 @@ import type {
   InventoryItem,
   OrderTimelineEvent,
   Payment,
+  Shift,
+  DayClose,
+  ReportTemplate,
+  ReportRun,
+  Notification,
+  Expense,
+  ExpenseCreate,
 } from './types'
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
@@ -221,77 +229,54 @@ class ApiClient {
     return this.request<PermissionGroup[]>('/groups')
   }
 
-  // ── Menu/Category endpoints ─────────────────────────────────────────────
-  // Note: Backend uses /menus structure. These map to the available endpoints.
-  // Categories don't have a direct backend equivalent yet — these calls will
-  // gracefully fail until the backend is updated.
+  // ── Category endpoints (backend: /products/categories) ──────────────────
 
   async getCategories(storeId: string): Promise<Category[]> {
-    return this.request<Category[]>(`/stores/${storeId}/categories`)
+    return this.request<Category[]>(`/products/categories?store_id=${storeId}`)
   }
 
   async createCategory(storeId: string, data: CategoryCreate): Promise<Category> {
-    return this.request<Category>(`/stores/${storeId}/categories`, {
+    return this.request<Category>(`/products/categories?store_id=${storeId}`, {
       method: 'POST',
       body: JSON.stringify(data),
     })
   }
 
   async updateCategory(storeId: string, categoryId: string, data: CategoryUpdate): Promise<Category> {
-    return this.request<Category>(`/stores/${storeId}/categories/${categoryId}`, {
+    return this.request<Category>(`/products/categories/${categoryId}?store_id=${storeId}`, {
       method: 'PUT',
       body: JSON.stringify(data),
     })
   }
 
   async deleteCategory(storeId: string, categoryId: string): Promise<void> {
-    return this.request<void>(`/stores/${storeId}/categories/${categoryId}`, { method: 'DELETE' })
+    return this.request<void>(`/products/categories/${categoryId}?store_id=${storeId}`, { method: 'DELETE' })
   }
 
-  async reorderCategories(storeId: string, categoryIds: string[]): Promise<void> {
-    return this.request<void>(`/stores/${storeId}/categories/reorder`, {
-      method: 'PUT',
-      body: JSON.stringify({ category_ids: categoryIds }),
-    })
-  }
-
-  // ── Menu Item endpoints ─────────────────────────────────────────────────
+  // ── Product / Menu Item endpoints (backend: /products) ──────────────────
 
   async getMenuItems(storeId: string, categoryId?: string): Promise<MenuItem[]> {
-    const params = categoryId ? `?category_id=${categoryId}` : ''
-    return this.request<MenuItem[]>(`/stores/${storeId}/menu-items${params}`)
+    const params = new URLSearchParams({ store_id: storeId })
+    if (categoryId) params.append('category_id', categoryId)
+    return this.request<MenuItem[]>(`/products?${params.toString()}`)
   }
 
   async createMenuItem(storeId: string, data: MenuItemCreate): Promise<MenuItem> {
-    return this.request<MenuItem>(`/stores/${storeId}/menu-items`, {
+    return this.request<MenuItem>(`/products?store_id=${storeId}`, {
       method: 'POST',
       body: JSON.stringify(data),
     })
   }
 
   async updateMenuItem(storeId: string, itemId: string, data: MenuItemUpdate): Promise<MenuItem> {
-    return this.request<MenuItem>(`/stores/${storeId}/menu-items/${itemId}`, {
+    return this.request<MenuItem>(`/products/${itemId}?store_id=${storeId}`, {
       method: 'PUT',
       body: JSON.stringify(data),
     })
   }
 
   async deleteMenuItem(storeId: string, itemId: string): Promise<void> {
-    return this.request<void>(`/stores/${storeId}/menu-items/${itemId}`, { method: 'DELETE' })
-  }
-
-  async reorderMenuItems(storeId: string, categoryId: string, itemIds: string[]): Promise<void> {
-    return this.request<void>(`/stores/${storeId}/menu-items/reorder`, {
-      method: 'PUT',
-      body: JSON.stringify({ category_id: categoryId, item_ids: itemIds }),
-    })
-  }
-
-  async bulkUpdateMenuItems(storeId: string, itemIds: string[], data: Partial<MenuItemUpdate>): Promise<void> {
-    return this.request<void>(`/stores/${storeId}/menu-items/bulk`, {
-      method: 'PUT',
-      body: JSON.stringify({ item_ids: itemIds, ...data }),
-    })
+    return this.request<void>(`/products/${itemId}?store_id=${storeId}`, { method: 'DELETE' })
   }
 
   // ── Order endpoints ─────────────────────────────────────────────────────
@@ -326,8 +311,8 @@ class ApiClient {
     return this.request<AnalyticsSummary>(`/analytics/summary?store_id=${storeId}`)
   }
 
-  async getAnalyticsByStore(): Promise<Record<string, AnalyticsSummary>> {
-    return this.request<Record<string, AnalyticsSummary>>('/analytics/summary/by-store')
+  async getAnalyticsByStore(): Promise<OutletAnalyticsResponse> {
+    return this.request<OutletAnalyticsResponse>('/analytics/summary/by-store')
   }
 
   // ── KOT endpoints ──────────────────────────────────────────────────────
@@ -343,7 +328,7 @@ class ApiClient {
   }
 
   async updateKOTStatus(storeId: string, kotId: string, status: KOT['status']): Promise<KOT> {
-    return this.request<KOT>(`/stores/${storeId}/kots/${kotId}`, {
+    return this.request<KOT>(`/stores/${storeId}/kots/${kotId}/status`, {
       method: 'PUT',
       body: JSON.stringify({ status }),
     })
@@ -383,6 +368,93 @@ class ApiClient {
     return this.request<void>(`/stores/${storeId}/orders/bulk`, {
       method: 'PUT',
       body: JSON.stringify({ order_ids: orderIds, status }),
+    })
+  }
+
+  // ── Shift endpoints ─────────────────────────────────────────────────────
+
+  async getShifts(storeId: string, status?: string): Promise<Shift[]> {
+    const params = new URLSearchParams({ store_id: storeId })
+    if (status) params.append('status', status)
+    return this.request<Shift[]>(`/shifts?${params.toString()}`)
+  }
+
+  async getShift(shiftId: string): Promise<Shift> {
+    return this.request<Shift>(`/shifts/${shiftId}`)
+  }
+
+  async getDayCloses(storeId: string): Promise<DayClose[]> {
+    return this.request<DayClose[]>(`/shifts/day-close?store_id=${storeId}`)
+  }
+
+  async generateDayClose(storeId: string, businessDate: string): Promise<DayClose> {
+    return this.request<DayClose>('/shifts/day-close', {
+      method: 'POST',
+      body: JSON.stringify({ store_id: storeId, business_date: businessDate }),
+    })
+  }
+
+  // ── Report endpoints ────────────────────────────────────────────────────
+
+  async getReportTypes(category?: string): Promise<ReportTemplate[]> {
+    const params = category ? `?category=${category}` : ''
+    return this.request<ReportTemplate[]>(`/reports/types${params}`)
+  }
+
+  async generateReport(templateCode: string, storeId: string, parameters?: Record<string, unknown>): Promise<ReportRun> {
+    return this.request<ReportRun>('/reports/generate', {
+      method: 'POST',
+      body: JSON.stringify({
+        template_code: templateCode,
+        store_id: storeId,
+        parameters: parameters || null,
+      }),
+    })
+  }
+
+  async getReport(reportId: string): Promise<ReportRun> {
+    return this.request<ReportRun>(`/reports/${reportId}`)
+  }
+
+  async getReports(storeId?: string): Promise<ReportRun[]> {
+    const params = storeId ? `?store_id=${storeId}` : ''
+    return this.request<ReportRun[]>(`/reports${params}`)
+  }
+
+  // ── Notification endpoints ──────────────────────────────────────────────
+
+  async getNotifications(storeId?: string, isRead?: boolean): Promise<Notification[]> {
+    const params = new URLSearchParams()
+    if (storeId) params.append('store_id', storeId)
+    if (isRead !== undefined) params.append('is_read', String(isRead))
+    const qs = params.toString()
+    return this.request<Notification[]>(`/notifications${qs ? `?${qs}` : ''}`)
+  }
+
+  async markNotificationRead(notificationId: string, isRead: boolean = true): Promise<Notification> {
+    return this.request<Notification>(`/notifications/${notificationId}/read`, {
+      method: 'PUT',
+      body: JSON.stringify({ is_read: isRead }),
+    })
+  }
+
+  async markAllNotificationsRead(storeId?: string): Promise<void> {
+    const qs = storeId ? `?store_id=${storeId}` : ''
+    return this.request<void>(`/notifications/mark-all-read${qs}`, {
+      method: 'POST',
+    })
+  }
+
+  // ── Expense endpoints ───────────────────────────────────────────────────
+
+  async getExpenses(storeId: string): Promise<Expense[]> {
+    return this.request<Expense[]>(`/expenses?store_id=${storeId}`)
+  }
+
+  async createExpense(data: ExpenseCreate): Promise<Expense> {
+    return this.request<Expense>('/expenses', {
+      method: 'POST',
+      body: JSON.stringify(data),
     })
   }
 }

@@ -35,7 +35,7 @@ import {
   XCircle,
   Clock,
   RefreshCw,
-  DollarSign,
+  IndianRupee,
   ShoppingBag,
   TrendingUp,
   Users,
@@ -244,7 +244,7 @@ export default function OrdersListPage() {
         const amount = order.net_amount || order.total || 0
         return (
           <span className="font-medium">
-            ${amount.toFixed(2)}
+            ₹{amount.toFixed(2)}
           </span>
         )
       },
@@ -354,10 +354,10 @@ export default function OrdersListPage() {
             <CardTitle className="text-sm font-medium text-muted-foreground">
               Total Revenue
             </CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
+            <IndianRupee className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">${totalRevenue.toFixed(2)}</div>
+            <div className="text-2xl font-bold">₹{totalRevenue.toFixed(2)}</div>
           </CardContent>
         </Card>
         <Card>

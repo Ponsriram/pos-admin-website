@@ -2,8 +2,6 @@
 
 import { useState, useEffect } from 'react'
 import { useSearchParams } from 'next/navigation'
-import Link from 'next/link'
-import Image from 'next/image'
 import { ColumnDef } from '@tanstack/react-table'
 import { DataTable } from '@/components/ui/data-table'
 import { Button } from '@/components/ui/button'
@@ -33,7 +31,6 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import {
   Plus,
   MoreHorizontal,
-  GripVertical,
   Folder,
   FolderOpen,
   ChevronRight,
@@ -41,7 +38,6 @@ import {
   Trash2,
   Eye,
   EyeOff,
-  Leaf,
 } from 'lucide-react'
 import { api } from '@/lib/api'
 import type { Category, MenuItem } from '@/lib/types'
@@ -64,18 +60,16 @@ export default function MenuPage() {
   const [isCategoryDialogOpen, setIsCategoryDialogOpen] = useState(false)
   const [isItemDialogOpen, setIsItemDialogOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [selectedItems, setSelectedItems] = useState<MenuItem[]>([])
   const [editingCategory, setEditingCategory] = useState<Category | null>(null)
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null)
 
-  const [categoryForm, setCategoryForm] = useState({ name: '', description: '' })
+  const [categoryForm, setCategoryForm] = useState({ name: '' })
   const [itemForm, setItemForm] = useState({
     name: '',
     description: '',
     price: '',
-    image_url: '',
-    is_available: true,
-    is_vegetarian: false,
+    tax_percent: '0',
+    is_active: true,
   })
 
   useEffect(() => {
@@ -111,12 +105,10 @@ export default function MenuPage() {
     try {
       const newCategory = await api.createCategory(storeId, {
         name: categoryForm.name,
-        description: categoryForm.description,
-        sort_order: categories.length + 1,
       })
       setCategories((prev) => [...prev, newCategory])
       setIsCategoryDialogOpen(false)
-      setCategoryForm({ name: '', description: '' })
+      setCategoryForm({ name: '' })
     } catch (error) {
       console.error('Failed to create category:', error)
     } finally {
@@ -128,10 +120,10 @@ export default function MenuPage() {
     if (!editingCategory || !storeId) return
     setIsSubmitting(true)
     try {
-      const updated = await api.updateCategory(storeId, editingCategory.id, categoryForm)
+      const updated = await api.updateCategory(storeId, editingCategory.id, { name: categoryForm.name })
       setCategories((prev) => prev.map((c) => (c.id === editingCategory.id ? updated : c)))
       setEditingCategory(null)
-      setCategoryForm({ name: '', description: '' })
+      setCategoryForm({ name: '' })
     } catch (error) {
       console.error('Failed to update category:', error)
     } finally {
@@ -163,9 +155,8 @@ export default function MenuPage() {
         name: itemForm.name,
         description: itemForm.description,
         price: parseFloat(itemForm.price),
-        image_url: itemForm.image_url || '/api/placeholder/200/200',
-        is_available: itemForm.is_available,
-        is_vegetarian: itemForm.is_vegetarian,
+        tax_percent: parseFloat(itemForm.tax_percent) || 0,
+        is_active: itemForm.is_active,
       })
       setMenuItems((prev) => [...prev, newItem])
       setIsItemDialogOpen(false)
@@ -185,9 +176,8 @@ export default function MenuPage() {
         name: itemForm.name,
         description: itemForm.description,
         price: parseFloat(itemForm.price),
-        image_url: itemForm.image_url,
-        is_available: itemForm.is_available,
-        is_vegetarian: itemForm.is_vegetarian,
+        tax_percent: parseFloat(itemForm.tax_percent) || 0,
+        is_active: itemForm.is_active,
       })
       setMenuItems((prev) => prev.map((i) => (i.id === editingItem.id ? updated : i)))
       setEditingItem(null)
@@ -213,27 +203,13 @@ export default function MenuPage() {
   const handleToggleItemAvailability = async (item: MenuItem) => {
     if (!storeId) return
     try {
-      await api.updateMenuItem(storeId, item.id, { is_available: !item.is_available })
+      await api.updateMenuItem(storeId, item.id, { is_active: !item.is_active })
       setMenuItems((prev) =>
-        prev.map((i) => (i.id === item.id ? { ...i, is_available: !i.is_available } : i))
+        prev.map((i) => (i.id === item.id ? { ...i, is_active: !i.is_active } : i))
       )
     } catch (error) {
       console.error('Failed to toggle item availability:', error)
     }
-  }
-
-  const handleBulkToggle = async (available: boolean) => {
-    if (!storeId) return
-    const ids = selectedItems.map((i) => i.id)
-    try {
-      await api.bulkUpdateMenuItems(storeId, ids, { is_available: available })
-    } catch (error) {
-      console.error('Failed to bulk update menu items:', error)
-    }
-    setMenuItems((prev) =>
-      prev.map((i) => (ids.includes(i.id) ? { ...i, is_available: available } : i))
-    )
-    setSelectedItems([])
   }
 
   const resetItemForm = () => {
@@ -241,9 +217,8 @@ export default function MenuPage() {
       name: '',
       description: '',
       price: '',
-      image_url: '',
-      is_available: true,
-      is_vegetarian: false,
+      tax_percent: '0',
+      is_active: true,
     })
   }
 
@@ -253,9 +228,8 @@ export default function MenuPage() {
       name: item.name,
       description: item.description || '',
       price: String(item.price),
-      image_url: item.image_url || '',
-      is_available: item.is_available,
-      is_vegetarian: item.is_vegetarian || false,
+      tax_percent: String(item.tax_percent || 0),
+      is_active: item.is_active,
     })
     setIsItemDialogOpen(true)
   }
@@ -264,18 +238,11 @@ export default function MenuPage() {
     setEditingCategory(category)
     setCategoryForm({
       name: category.name,
-      description: category.description || '',
     })
     setIsCategoryDialogOpen(true)
   }
 
   const columns: ColumnDef<MenuItem>[] = [
-    {
-      id: 'drag',
-      cell: () => (
-        <GripVertical className="h-4 w-4 text-muted-foreground cursor-grab" />
-      ),
-    },
     {
       accessorKey: 'name',
       header: 'Product',
@@ -283,21 +250,11 @@ export default function MenuPage() {
         const item = row.original
         return (
           <div className="flex items-center gap-3">
-            <div className="relative h-12 w-12 rounded-lg overflow-hidden bg-muted">
-              <Image
-                src={item.image_url || '/api/placeholder/200/200'}
-                alt={item.name}
-                fill
-                className="object-cover"
-              />
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary font-semibold text-sm">
+              {item.name.charAt(0).toUpperCase()}
             </div>
             <div>
-              <div className="font-medium flex items-center gap-2">
-                {item.name}
-                {item.is_vegetarian && (
-                  <Leaf className="h-4 w-4 text-green-600" />
-                )}
-              </div>
+              <div className="font-medium">{item.name}</div>
               <div className="text-sm text-muted-foreground line-clamp-1">
                 {item.description}
               </div>
@@ -321,23 +278,32 @@ export default function MenuPage() {
       header: 'Price',
       cell: ({ row }) => (
         <span className="font-medium text-primary">
-          ${(row.getValue('price') as number).toFixed(2)}
+          ₹{(row.getValue('price') as number).toFixed(2)}
         </span>
       ),
     },
     {
-      accessorKey: 'is_available',
+      accessorKey: 'tax_percent',
+      header: 'Tax %',
+      cell: ({ row }) => (
+        <span className="text-muted-foreground">
+          {(row.getValue('tax_percent') as number || 0)}%
+        </span>
+      ),
+    },
+    {
+      accessorKey: 'is_active',
       header: 'Status',
       cell: ({ row }) => {
         const item = row.original
         return (
           <div className="flex items-center gap-2">
             <Switch
-              checked={item.is_available}
+              checked={item.is_active}
               onCheckedChange={() => handleToggleItemAvailability(item)}
             />
-            <span className={item.is_available ? 'text-green-600' : 'text-muted-foreground'}>
-              {item.is_available ? 'Available' : 'Unavailable'}
+            <span className={item.is_active ? 'text-green-600' : 'text-muted-foreground'}>
+              {item.is_active ? 'Active' : 'Inactive'}
             </span>
           </div>
         )
@@ -360,15 +326,15 @@ export default function MenuPage() {
                 Edit
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => handleToggleItemAvailability(item)}>
-                {item.is_available ? (
+                {item.is_active ? (
                   <>
                     <EyeOff className="h-4 w-4 mr-2" />
-                    Mark Unavailable
+                    Mark Inactive
                   </>
                 ) : (
                   <>
                     <Eye className="h-4 w-4 mr-2" />
-                    Mark Available
+                    Mark Active
                   </>
                 )}
               </DropdownMenuItem>
@@ -398,7 +364,7 @@ export default function MenuPage() {
               setIsCategoryDialogOpen(open)
               if (!open) {
                 setEditingCategory(null)
-                setCategoryForm({ name: '', description: '' })
+                setCategoryForm({ name: '' })
               }
             }}>
               <DialogTrigger asChild>
@@ -409,7 +375,7 @@ export default function MenuPage() {
               <DialogContent>
                 <DialogHeader>
                   <DialogTitle>Add Category</DialogTitle>
-                  <DialogDescription>Create a new menu category.</DialogDescription>
+                  <DialogDescription>Create a new product category.</DialogDescription>
                 </DialogHeader>
                 <FieldGroup>
                   <Field>
@@ -418,14 +384,6 @@ export default function MenuPage() {
                       placeholder="e.g., Appetizers"
                       value={categoryForm.name}
                       onChange={(e) => setCategoryForm({ ...categoryForm, name: e.target.value })}
-                    />
-                  </Field>
-                  <Field>
-                    <FieldLabel>Description</FieldLabel>
-                    <Textarea
-                      placeholder="Brief description..."
-                      value={categoryForm.description}
-                      onChange={(e) => setCategoryForm({ ...categoryForm, description: e.target.value })}
                     />
                   </Field>
                 </FieldGroup>
@@ -474,7 +432,6 @@ export default function MenuPage() {
                           : 'hover:bg-muted'
                       )}
                     >
-                      <GripVertical className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 cursor-grab" />
                       {isSelected ? (
                         <FolderOpen className="h-4 w-4" />
                       ) : (
@@ -516,7 +473,7 @@ export default function MenuPage() {
       </Card>
 
       {/* Products Table */}
-      <div className="flex-1 space-y-4 min-w-0">
+      <div className="flex-1 space-y-4 min-w-0 overflow-auto">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-semibold flex items-center gap-2">
@@ -534,18 +491,6 @@ export default function MenuPage() {
             </p>
           </div>
           <div className="flex items-center gap-2">
-            {selectedItems.length > 0 && (
-              <>
-                <Button variant="outline" onClick={() => handleBulkToggle(true)}>
-                  <Eye className="h-4 w-4 mr-2" />
-                  Enable ({selectedItems.length})
-                </Button>
-                <Button variant="outline" onClick={() => handleBulkToggle(false)}>
-                  <EyeOff className="h-4 w-4 mr-2" />
-                  Disable ({selectedItems.length})
-                </Button>
-              </>
-            )}
             <Dialog open={isItemDialogOpen} onOpenChange={(open) => {
               setIsItemDialogOpen(open)
               if (!open) {
@@ -583,40 +528,35 @@ export default function MenuPage() {
                       onChange={(e) => setItemForm({ ...itemForm, description: e.target.value })}
                     />
                   </Field>
-                  <Field>
-                    <FieldLabel>Price</FieldLabel>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      placeholder="0.00"
-                      value={itemForm.price}
-                      onChange={(e) => setItemForm({ ...itemForm, price: e.target.value })}
-                    />
-                  </Field>
-                  <Field>
-                    <FieldLabel>Image URL</FieldLabel>
-                    <Input
-                      placeholder="https://..."
-                      value={itemForm.image_url}
-                      onChange={(e) => setItemForm({ ...itemForm, image_url: e.target.value })}
-                    />
-                  </Field>
-                  <div className="flex gap-6">
-                    <Field className="flex items-center gap-3">
-                      <Switch
-                        checked={itemForm.is_available}
-                        onCheckedChange={(checked) => setItemForm({ ...itemForm, is_available: checked })}
+                  <div className="grid grid-cols-2 gap-4">
+                    <Field>
+                      <FieldLabel>Price</FieldLabel>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        placeholder="0.00"
+                        value={itemForm.price}
+                        onChange={(e) => setItemForm({ ...itemForm, price: e.target.value })}
                       />
-                      <FieldLabel className="mb-0">Available</FieldLabel>
                     </Field>
-                    <Field className="flex items-center gap-3">
-                      <Switch
-                        checked={itemForm.is_vegetarian}
-                        onCheckedChange={(checked) => setItemForm({ ...itemForm, is_vegetarian: checked })}
+                    <Field>
+                      <FieldLabel>Tax %</FieldLabel>
+                      <Input
+                        type="number"
+                        step="0.5"
+                        placeholder="0"
+                        value={itemForm.tax_percent}
+                        onChange={(e) => setItemForm({ ...itemForm, tax_percent: e.target.value })}
                       />
-                      <FieldLabel className="mb-0">Vegetarian</FieldLabel>
                     </Field>
                   </div>
+                  <Field className="flex items-center gap-3">
+                    <Switch
+                      checked={itemForm.is_active}
+                      onCheckedChange={(checked) => setItemForm({ ...itemForm, is_active: checked })}
+                    />
+                    <FieldLabel className="mb-0">Active</FieldLabel>
+                  </Field>
                 </FieldGroup>
                 <DialogFooter>
                   <Button variant="outline" onClick={() => setIsItemDialogOpen(false)}>
@@ -641,8 +581,6 @@ export default function MenuPage() {
           searchKey="name"
           searchPlaceholder="Search products..."
           isLoading={isLoading}
-          enableSelection
-          onRowSelectionChange={setSelectedItems}
         />
       </div>
 
@@ -650,7 +588,7 @@ export default function MenuPage() {
       <Dialog open={!!editingCategory} onOpenChange={(open) => {
         if (!open) {
           setEditingCategory(null)
-          setCategoryForm({ name: '', description: '' })
+          setCategoryForm({ name: '' })
         }
       }}>
         <DialogContent>
@@ -664,13 +602,6 @@ export default function MenuPage() {
               <Input
                 value={categoryForm.name}
                 onChange={(e) => setCategoryForm({ ...categoryForm, name: e.target.value })}
-              />
-            </Field>
-            <Field>
-              <FieldLabel>Description</FieldLabel>
-              <Textarea
-                value={categoryForm.description}
-                onChange={(e) => setCategoryForm({ ...categoryForm, description: e.target.value })}
               />
             </Field>
           </FieldGroup>

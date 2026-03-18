@@ -35,7 +35,7 @@ import {
   Printer,
   CheckCircle,
   XCircle,
-  DollarSign,
+  IndianRupee,
   Receipt,
   Utensils,
   Truck,
@@ -364,14 +364,14 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                             Add-ons:{' '}
                             {item.add_ons.map((a, i) => (
                               <span key={i}>
-                                {a.name} (+${a.price.toFixed(2)})
+                                {a.name} (+₹{a.price.toFixed(2)})
                                 {i < item.add_ons!.length - 1 ? ', ' : ''}
                               </span>
                             ))}
                           </div>
                         )}
                       </div>
-                      <span className="font-medium">${itemTotal.toFixed(2)}</span>
+                      <span className="font-medium">₹{itemTotal.toFixed(2)}</span>
                     </div>
                   )
                 })}
@@ -379,22 +379,22 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Subtotal</span>
-                    <span>${orderSubtotal.toFixed(2)}</span>
+                    <span>₹{orderSubtotal.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Tax</span>
-                    <span>+${orderTax.toFixed(2)}</span>
+                    <span>+₹{orderTax.toFixed(2)}</span>
                   </div>
                   {orderDiscount > 0 && (
                     <div className="flex justify-between text-sm text-green-600">
                       <span>Discount</span>
-                      <span>-${orderDiscount.toFixed(2)}</span>
+                      <span>-₹{orderDiscount.toFixed(2)}</span>
                     </div>
                   )}
                   <Separator />
                   <div className="flex justify-between font-semibold text-lg">
                     <span>Total</span>
-                    <span className="text-primary">${orderTotal.toFixed(2)}</span>
+                    <span className="text-primary">₹{orderTotal.toFixed(2)}</span>
                   </div>
                 </div>
               </div>
@@ -449,17 +449,17 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
               <div className="space-y-2">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Total Amount</span>
-                  <span className="font-medium">${orderTotal.toFixed(2)}</span>
+                  <span className="font-medium">₹{orderTotal.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Paid</span>
-                  <span className="font-medium text-green-600">${totalPaid.toFixed(2)}</span>
+                  <span className="font-medium text-green-600">₹{totalPaid.toFixed(2)}</span>
                 </div>
                 {remainingAmount > 0 && (
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Remaining</span>
                     <span className="font-medium text-orange-600">
-                      ${remainingAmount.toFixed(2)}
+                      ₹{remainingAmount.toFixed(2)}
                     </span>
                   </div>
                 )}
@@ -476,7 +476,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                           <CreditCard className="h-4 w-4 text-muted-foreground" />
                           <span className="capitalize">{payment.payment_method || payment.method}</span>
                         </div>
-                        <span>${payment.amount.toFixed(2)}</span>
+                        <span>₹{payment.amount.toFixed(2)}</span>
                       </div>
                     ))}
                   </div>
@@ -487,7 +487,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                 <Dialog open={isPaymentDialogOpen} onOpenChange={setIsPaymentDialogOpen}>
                   <DialogTrigger asChild>
                     <Button className="w-full">
-                      <DollarSign className="h-4 w-4 mr-2" />
+                      <IndianRupee className="h-4 w-4 mr-2" />
                       Add Payment
                     </Button>
                   </DialogTrigger>
@@ -495,7 +495,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                     <DialogHeader>
                       <DialogTitle>Add Payment</DialogTitle>
                       <DialogDescription>
-                        Record a payment for this order. Remaining: ${remainingAmount.toFixed(2)}
+                        Record a payment for this order. Remaining: ₹{remainingAmount.toFixed(2)}
                       </DialogDescription>
                     </DialogHeader>
                     <FieldGroup>

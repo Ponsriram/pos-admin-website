@@ -85,7 +85,6 @@ export default function EmployeesPage() {
     email: '',
     phone: '',
     role: 'waiter' as string,
-    employee_code: '',
     pin: '',
     is_active: true,
   })
@@ -120,7 +119,6 @@ export default function EmployeesPage() {
       const newEmployee = await api.createEmployee(storeId, {
         store_id: storeId,
         name: formData.name,
-        employee_code: formData.employee_code || formData.name.toLowerCase().replace(/\s/g, '_'),
         pin: formData.pin || '0000',
         email: formData.email || undefined,
         phone: formData.phone || undefined,
@@ -204,7 +202,6 @@ export default function EmployeesPage() {
       email: '',
       phone: '',
       role: 'waiter',
-      employee_code: '',
       pin: '',
       is_active: true,
     })
@@ -217,7 +214,6 @@ export default function EmployeesPage() {
       email: employee.email || '',
       phone: employee.phone || '',
       role: employee.role,
-      employee_code: employee.employee_code || '',
       pin: '',
       is_active: employee.is_active,
     })
@@ -266,6 +262,15 @@ export default function EmployeesPage() {
           </div>
         )
       },
+    },
+    {
+      accessorKey: 'employee_code',
+      header: 'Emp ID',
+      cell: ({ row }) => (
+        <Badge variant="outline" className="font-mono text-xs">
+          {row.getValue('employee_code') || '-'}
+        </Badge>
+      ),
     },
     {
       accessorKey: 'phone',
@@ -410,14 +415,7 @@ export default function EmployeesPage() {
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   />
                 </Field>
-                <Field>
-                  <FieldLabel>Employee Code</FieldLabel>
-                  <Input
-                    placeholder="e.g., EMP001"
-                    value={formData.employee_code}
-                    onChange={(e) => setFormData({ ...formData, employee_code: e.target.value })}
-                  />
-                </Field>
+
                 <Field>
                   <FieldLabel>PIN</FieldLabel>
                   <Input

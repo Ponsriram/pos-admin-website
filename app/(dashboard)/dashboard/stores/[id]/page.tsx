@@ -35,7 +35,7 @@ import {
   Users,
   Plus,
   TrendingUp,
-  DollarSign,
+  IndianRupee,
   ShoppingBag,
   MoreHorizontal,
   Edit,
@@ -284,11 +284,11 @@ export default function StoreDetailPage({ params }: { params: Promise<{ id: stri
                 <CardTitle className="text-sm font-medium text-muted-foreground">
                   Total Revenue
                 </CardTitle>
-                <DollarSign className="h-4 w-4 text-muted-foreground" />
+                <IndianRupee className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">
-                  ${analytics?.total_revenue.toLocaleString() || '0'}
+                  ₹{analytics?.total_revenue.toLocaleString() || '0'}
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">Last 30 days</p>
               </CardContent>
@@ -316,7 +316,7 @@ export default function StoreDetailPage({ params }: { params: Promise<{ id: stri
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">
-                  ${averageOrderValue.toFixed(2)}
+                  ₹{averageOrderValue.toFixed(2)}
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">Per order</p>
               </CardContent>
@@ -457,7 +457,7 @@ export default function StoreDetailPage({ params }: { params: Promise<{ id: stri
                 {analytics?.payment_breakdown && Object.entries(analytics.payment_breakdown).map(([method, amount]) => (
                   <div key={method} className="flex justify-between">
                     <span className="text-muted-foreground capitalize">{method}</span>
-                    <span className="font-medium">${amount.toLocaleString()}</span>
+                    <span className="font-medium">₹{amount.toLocaleString()}</span>
                   </div>
                 ))}
                 {(!analytics?.payment_breakdown || Object.keys(analytics.payment_breakdown).length === 0) && (
@@ -471,7 +471,7 @@ export default function StoreDetailPage({ params }: { params: Promise<{ id: stri
               </CardHeader>
               <CardContent>
                 <div className="text-3xl font-bold text-primary">
-                  ${analytics?.net_sales.toLocaleString() || '0'}
+                  ₹{analytics?.net_sales.toLocaleString() || '0'}
                 </div>
                 <p className="text-sm text-muted-foreground mt-2">After taxes and discounts</p>
               </CardContent>
@@ -487,7 +487,7 @@ export default function StoreDetailPage({ params }: { params: Promise<{ id: stri
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Avg Order</span>
-                  <span className="font-medium">${averageOrderValue.toFixed(2)}</span>
+                  <span className="font-medium">₹{averageOrderValue.toFixed(2)}</span>
                 </div>
               </CardContent>
             </Card>

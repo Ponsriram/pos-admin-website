@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { useStore } from '@/contexts/store-context'
 import { api } from '@/lib/api'
 import type { AnalyticsSummary, Order } from '@/lib/types'
@@ -8,12 +9,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
-  DollarSign,
+  IndianRupee,
   ShoppingBag,
   CreditCard,
   Banknote,
-  Plus,
-  Package,
   Users,
   ArrowUpRight,
 } from 'lucide-react'
@@ -52,7 +51,7 @@ export default function DashboardPage() {
     }
 
     fetchData()
-    const interval = setInterval(fetchData, 30000) // Auto-refresh every 30s
+    const interval = setInterval(fetchData, 30000)
     return () => clearInterval(interval)
   }, [currentStore])
 
@@ -64,9 +63,9 @@ export default function DashboardPage() {
     : []
 
   const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('en-US', {
+    return new Intl.NumberFormat('en-IN', {
       style: 'currency',
-      currency: 'USD',
+      currency: 'INR',
     }).format(value)
   }
 
@@ -87,18 +86,18 @@ export default function DashboardPage() {
           <p className="text-muted-foreground">Welcome back! Here&apos;s your store overview.</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm">
-            <Package className="h-4 w-4 mr-2" />
-            Inventory
-          </Button>
-          <Button variant="outline" size="sm">
-            <Users className="h-4 w-4 mr-2" />
-            Employees
-          </Button>
-          <Button size="sm">
-            <Plus className="h-4 w-4 mr-2" />
-            New Order
-          </Button>
+          <Link href="/dashboard/employees">
+            <Button variant="outline" size="sm">
+              <Users className="h-4 w-4 mr-2" />
+              Employees
+            </Button>
+          </Link>
+          <Link href="/dashboard/orders">
+            <Button size="sm">
+              <ShoppingBag className="h-4 w-4 mr-2" />
+              Live Orders
+            </Button>
+          </Link>
         </div>
       </div>
 
@@ -107,7 +106,7 @@ export default function DashboardPage() {
         <MetricCard
           title="Total Revenue"
           value={analytics ? formatCurrency(analytics.total_revenue) : '-'}
-          icon={DollarSign}
+          icon={IndianRupee}
           isLoading={isLoading}
         />
         <MetricCard
@@ -140,6 +139,10 @@ export default function DashboardPage() {
           <CardContent>
             {isLoading ? (
               <Skeleton className="h-[200px] w-full" />
+            ) : paymentData.length === 0 ? (
+              <div className="flex items-center justify-center h-[200px] text-muted-foreground text-sm">
+                No payment data yet
+              </div>
             ) : (
               <div className="h-[200px]">
                 <ResponsiveContainer width="100%" height="100%">
@@ -189,10 +192,12 @@ export default function DashboardPage() {
         <Card className="lg:col-span-2">
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="text-lg">Recent Orders</CardTitle>
-            <Button variant="ghost" size="sm">
-              View all
-              <ArrowUpRight className="h-4 w-4 ml-1" />
-            </Button>
+            <Link href="/dashboard/orders/list">
+              <Button variant="ghost" size="sm">
+                View all
+                <ArrowUpRight className="h-4 w-4 ml-1" />
+              </Button>
+            </Link>
           </CardHeader>
           <CardContent>
             {isLoading ? (
@@ -206,36 +211,37 @@ export default function DashboardPage() {
             ) : (
               <div className="space-y-2">
                 {recentOrders.map((order) => (
-                  <div
-                    key={order.id}
-                    className="flex items-center justify-between p-3 rounded-lg bg-muted/50"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                        <ShoppingBag className="h-5 w-5 text-primary" />
+                  <Link key={order.id} href={`/dashboard/orders/${order.id}`}>
+                    <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors cursor-pointer">
+                      <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                          <ShoppingBag className="h-5 w-5 text-primary" />
+                        </div>
+                        <div>
+                          <p className="font-medium">#{order.order_number || order.id.slice(0, 8)}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {order.customer_name || 'Walk-in'} • {order.items?.length || 0} items
+                          </p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="font-medium">{order.order_number}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {order.customer_name || 'Walk-in'} • {order.items.length} items
-                        </p>
+                      <div className="text-right">
+                        <p className="font-medium">{formatCurrency(order.net_amount || order.total || 0)}</p>
+                        <span
+                          className={`text-xs px-2 py-0.5 rounded-full capitalize ${
+                            order.status === 'completed'
+                              ? 'bg-green-100 text-green-700'
+                              : order.status === 'preparing'
+                              ? 'bg-yellow-100 text-yellow-700'
+                              : order.status === 'pending'
+                              ? 'bg-orange-100 text-orange-700'
+                              : 'bg-muted text-muted-foreground'
+                          }`}
+                        >
+                          {order.status}
+                        </span>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <p className="font-medium">{formatCurrency(order.net_amount || order.total || 0)}</p>
-                      <span
-                        className={`text-xs px-2 py-0.5 rounded-full ${
-                          order.status === 'completed'
-                            ? 'bg-green-100 text-green-700'
-                            : order.status === 'preparing'
-                            ? 'bg-yellow-100 text-yellow-700'
-                            : 'bg-muted text-muted-foreground'
-                        }`}
-                      >
-                        {order.status}
-                      </span>
-                    </div>
-                  </div>
+                  </Link>
                 ))}
               </div>
             )}
